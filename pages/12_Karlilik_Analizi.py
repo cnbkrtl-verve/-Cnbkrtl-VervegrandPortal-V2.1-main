@@ -349,88 +349,84 @@ if st.session_state.profit_df is not None and not st.session_state.profit_df.emp
                     st.error(f"⚠️ Bu siparişte {abs(net_profit):,.2f} ₺ zarar görünüyor. Lütfen yukarıdaki tablodan birim maliyetleri kontrol edin.")
                     st.info("Eğer 'Birim Maliyet (Ham)' beklediğinizden yüksekse, Sentos'taki alış fiyatını kontrol edin.")
                     st.info("Eğer 'Birim Maliyet (Ham)' 0.00 ₺ ise, ürün Sentos'ta bulunamamış veya maliyeti girilmemiştir.")
-if st.session_state.profit_df is not None and not st.session_state.profit_df.empty:
-    df = st.session_state.profit_df
-    
-    # Özet Metrikler
-    total_revenue = df['Toplam Tutar'].sum()
-    total_cost = df["Ürün Maliyeti (KDV'li)"].sum()
-    total_shipping = df['Kargo Gideri'].sum()
-    total_net_profit = df['Net Kâr'].sum()
-    avg_margin = df['Kâr Marjı (%)'].mean()
-    
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Toplam Ciro", f"{total_revenue:,.2f} ₺")
-    m2.metric("Toplam Maliyet (KDV'li)", f"{total_cost:,.2f} ₺", delta_color="inverse")
-    m3.metric("Toplam Kargo", f"{total_shipping:,.2f} ₺", delta_color="inverse")
-    m4.metric("Toplam Net Kâr", f"{total_net_profit:,.2f} ₺", f"%{avg_margin:.1f}", delta_color="normal")
-    
-    if total_cost == 0 and total_revenue > 0:
-        st.warning("⚠️ Toplam maliyet 0.00 ₺ görünüyor. Bu durum şunlardan kaynaklanabilir:")
-        st.markdown("""
-        - Ürünlerin Sentos'ta **alış fiyatı** girilmemiş olabilir.
-        - Shopify'daki **SKU**'lar ile Sentos'taki **SKU** veya **Barkod**'lar eşleşmiyor olabilir.
-        - "Geliştirici Detayları" kısmından hangi ürünlerin maliyetinin bulunamadığını kontrol edebilirsiniz.
-        """)
-    
-    # Grafikler
-    c_chart1, c_chart2 = st.columns(2)
-    
-    with c_chart1:
-        # Günlük Kâr Grafiği
-        daily_profit = df.groupby('Tarih')['Net Kâr'].sum().reset_index()
-        fig_daily = px.bar(daily_profit, x='Tarih', y='Net Kâr', title="Günlük Net Kâr Dağılımı", color='Net Kâr', color_continuous_scale='RdYlGn')
-        st.plotly_chart(fig_daily, use_container_width=True)
-        
-    with c_chart2:
-        # Kâr Marjı Histogramı
-        fig_hist = px.histogram(df, x="Kâr Marjı (%)", nbins=20, title="Sipariş Kâr Marjı Dağılımı", color_discrete_sequence=['#00CC96'])
-        st.plotly_chart(fig_hist, use_container_width=True)
-        
-    # Detaylı Tablo (Ag-Grid)
-    st.subheader("📋 Sipariş Detayları")
-    
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)
-    gb.configure_side_bar()
-    gb.configure_default_column(groupable=True, value=True, enableRowGroup=True, aggFunc='sum', editable=False)
-    
-    # Para formatları
-    currency_cols = ['Toplam Tutar', "Ürün Maliyeti (KDV'li)", 'Kargo Gideri', 'Brüt Kâr', 'Net Kâr']
-    for col in currency_cols:
-        gb.configure_column(col, type=["numericColumn", "numberColumnFilter", "customNumericFormat"], precision=2)
-        
-    gb.configure_column("Kâr Marjı (%)", type=["numericColumn", "numberColumnFilter"], precision=2)
-    
-    # Koşullu Biçimlendirme (Negatif kâr kırmızı)
-    js_code = JsCode("""
-    function(params) {
-        if (params.value < 0) {
-            return {'color': 'red', 'fontWeight': 'bold'};
-        } else {
-            return {'color': 'green', 'fontWeight': 'bold'};
-        }
-    }
-    """)
-    gb.configure_column("Net Kâr", cellStyle=js_code)
-    
-    gridOptions = gb.build()
-    
-    AgGrid(
-        df,
-        gridOptions=gridOptions,
-        enable_enterprise_modules=False,
-        allow_unsafe_jscode=True,
-        columns_auto_size_mode=2,
-        theme='streamlit'
-    )
-    
-    # İndirme Butonu
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "📥 Raporu İndir (CSV)",
-        csv,
-        "karlilik_raporu.csv",
-        "text/csv",
-        key='download-csv'
-    )
+                
+                # --- CANLI KONTROL BUTONU ---
+                st.divider()
+                if st.button("🔍 Bu Sipariş İçin Canlı Sentos Kontrolü Yap (Debug)", type="secondary"):
+                    st.info("Sentos API'ye canlı sorgu atılıyor... Lütfen bekleyin.")
+                    
+                    # API Bağlantısı (Tekrar kuruyoruz çünkü session state'de obje saklanamaz)
+                    try:
+                        user_keys = load_all_user_keys(st.session_state.username)
+                        sentos_debug = SentosAPI(
+                            user_keys['sentos_api_url'],
+                            user_keys['sentos_api_key'],
+                            user_keys['sentos_api_secret'],
+                            user_keys['sentos_cookie']
+                        )
+                        
+                        debug_results = []
+                        
+                        for item in selected_order.get('lineItems', {}).get('nodes', []):
+                            sku = str(item.get('variant', {}).get('sku', '')).strip()
+                            
+                            # 1. SKU ile Ara
+                            found_product = sentos_debug.get_product_by_sku(sku)
+                            method = "SKU"
+                            
+                            # 2. Bulunamazsa Barkod ile Ara
+                            if not found_product:
+                                found_product = sentos_debug.get_product_by_barcode(sku)
+                                method = "BARKOD"
+                            
+                            if found_product:
+                                p_name = found_product.get('name', 'İsimsiz')
+                                p_sku = found_product.get('sku', '')
+                                p_price = found_product.get('purchase_price') or found_product.get('AlisFiyati')
+                                
+                                # Varyant kontrolü
+                                variant_match = "Hayır"
+                                variant_sku = "-"
+                                
+                                # Varyantlarda ara
+                                for v in found_product.get('variants', []):
+                                    v_s = str(v.get('sku', '')).strip().lower()
+                                    v_b = str(v.get('barcode', '')).strip().lower()
+                                    target = sku.lower()
+                                    
+                                    if v_s == target or v_b == target:
+                                        variant_match = "Evet"
+                                        variant_sku = v.get('sku', '')
+                                        # Varyant fiyatı varsa onu al
+                                        v_p = v.get('purchase_price') or v.get('AlisFiyati')
+                                        if v_p:
+                                            p_price = v_p
+                                        break
+                                
+                                debug_results.append({
+                                    "Aranan SKU": sku,
+                                    "Bulunan Yöntem": method,
+                                    "Sentos Ürün Adı": p_name,
+                                    "Sentos Ana SKU": p_sku,
+                                    "Varyant Eşleşmesi": variant_match,
+                                    "Varyant SKU": variant_sku,
+                                    "Sentos Fiyat (Ham)": p_price
+                                })
+                            else:
+                                debug_results.append({
+                                    "Aranan SKU": sku,
+                                    "Bulunan Yöntem": "-",
+                                    "Sentos Ürün Adı": "BULUNAMADI",
+                                    "Sentos Ana SKU": "-",
+                                    "Varyant Eşleşmesi": "-",
+                                    "Varyant SKU": "-",
+                                    "Sentos Fiyat (Ham)": "0"
+                                })
+                        
+                        st.write("### Canlı Sorgu Sonuçları")
+                        st.dataframe(pd.DataFrame(debug_results))
+                        st.warning("Not: Eğer 'Sentos Ürün Adı' tüm satırlarda aynıysa, API yanlış ürünü döndürüyor demektir.")
+                        
+                    except Exception as e:
+                        st.error(f"Canlı kontrol sırasında hata: {e}")
+

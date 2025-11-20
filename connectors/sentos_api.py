@@ -149,14 +149,24 @@ class SentosAPI:
             
             # Tam eşleşme kontrolü (Case insensitive)
             target_sku = sku.strip().lower()
+            
+            # 1. Ana ürünlerde ara
             for product in products:
                 p_sku = str(product.get('sku', '')).strip().lower()
                 if p_sku == target_sku:
                     return product
             
-            # Eğer tam eşleşme yoksa, ilk ürünü döndür ama logla
-            logging.warning(f"SKU '{sku}' için tam eşleşme bulunamadı, ilk sonuç kullanılıyor: {products[0].get('sku')}")
-            return products[0]
+            # 2. Varyantlarda ara
+            for product in products:
+                for variant in product.get('variants', []):
+                    v_sku = str(variant.get('sku', '')).strip().lower()
+                    if v_sku == target_sku:
+                        # Varyant bulundu, ana ürünü döndür (fiyat bilgisi için)
+                        return product
+
+            # Eğer tam eşleşme yoksa, None döndür (YANLIŞ EŞLEŞMEYİ ÖNLEMEK İÇİN)
+            logging.warning(f"SKU '{sku}' için tam eşleşme bulunamadı. (Bulunanlar: {[p.get('sku') for p in products]})")
+            return None
             
         except Exception as e:
             logging.error(f"Sentos'ta SKU '{sku}' aranırken hata: {e}")
@@ -177,22 +187,23 @@ class SentosAPI:
             
             # Tam eşleşme kontrolü
             target_barcode = barcode.strip().lower()
+            
+            # 1. Ana ürünlerde ara
             for product in products:
                 p_barcode = str(product.get('barcode', '')).strip().lower()
                 if p_barcode == target_barcode:
                     return product
             
-            # Varyantlarda barkod ara
+            # 2. Varyantlarda ara
             for product in products:
                 for variant in product.get('variants', []):
                     v_barcode = str(variant.get('barcode', '')).strip().lower()
                     if v_barcode == target_barcode:
-                        # Varyantı değil ana ürünü döndürüyoruz, çünkü fiyat bilgisini oradan alacağız
-                        # (veya varyant fiyatını sales_analytics içinde alacağız)
                         return product
 
-            logging.warning(f"Barkod '{barcode}' için tam eşleşme bulunamadı, ilk sonuç kullanılıyor: {products[0].get('barcode')}")
-            return products[0]
+            # Eğer tam eşleşme yoksa, None döndür
+            logging.warning(f"Barkod '{barcode}' için tam eşleşme bulunamadı. (Bulunanlar: {[p.get('barcode') for p in products]})")
+            return None
             
         except Exception as e:
             logging.error(f"Sentos'ta Barkod '{barcode}' aranırken hata: {e}")
