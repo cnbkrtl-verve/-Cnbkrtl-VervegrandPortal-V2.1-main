@@ -20,16 +20,27 @@ class SalesAnalytics:
         """
         self.sentos_api = sentos_api
     
-    def _fetch_costs_for_skus(self, skus, progress_callback=None):
+    def _fetch_costs_for_skus(self, skus_or_map, progress_callback=None):
         """
-        Verilen SKU listesi için Sentos'tan maliyet verilerini çeker.
+        Verilen SKU listesi veya SKU->İsim haritası için Sentos'tan maliyet verilerini çeker.
         Multi-threading kullanarak hızlandırılmıştır.
+        
+        Args:
+            skus_or_map: SKU listesi (set/list) veya {sku: product_name} sözlüğü
         """
         cost_map = {}
-        if not skus:
+        if not skus_or_map:
             return cost_map
             
-        total_skus = len(skus)
+        # Girdi tipini kontrol et ve normalize et
+        if isinstance(skus_or_map, dict):
+            sku_list = list(skus_or_map.keys())
+            sku_name_map = skus_or_map
+        else:
+            sku_list = list(skus_or_map)
+            sku_name_map = {}
+            
+        total_skus = len(sku_list)
         logging.info(f"Toplam {total_skus} adet benzersiz SKU için maliyet aranacak.")
         
         if progress_callback:
@@ -52,12 +63,19 @@ class SalesAnalytics:
                 
                 product = self.sentos_api.get_product_by_sku(sku)
                 
-                # Fallback: SKU ile bulunamadıysa Barkod ile ara
+                # Fallback 1: SKU ile bulunamadıysa Barkod ile ara
                 if not product:
                     product = self.sentos_api.get_product_by_barcode(sku)
+                
+                # Fallback 2: İsim ile ara (Eğer isim haritasında varsa)
+                if not product and sku in sku_name_map:
+                    name = sku_name_map[sku]
+                    # İsim boş değilse ara
+                    if name and len(name) > 3:
+                        product = self.sentos_api.get_product_by_name(name)
                     
                 if not product:
-                    logging.warning(f"SKU {sku} için ürün bulunamadı.")
+                    logging.warning(f"SKU {sku} için ürün bulunamadı (SKU, Barkod ve İsim denendi).")
                     return
                 
                 # Debug: Ürün verisini logla
@@ -112,7 +130,7 @@ class SalesAnalytics:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Future'ları oluştur
-            future_to_sku = {executor.submit(fetch_sku, sku): sku for sku in skus}
+            future_to_sku = {executor.submit(fetch_sku, sku): sku for sku in sku_list}
             
             for i, future in enumerate(concurrent.futures.as_completed(future_to_sku)):
                 processed_count += 1
@@ -157,8 +175,8 @@ class SalesAnalytics:
         
         logging.info(f"Toplam {len(all_orders)} sipariş çekildi")
         
-        # 2. Siparişlerdeki Benzersiz SKU'ları Belirle
-        unique_skus = set()
+        # 2. Siparişlerdeki Benzersiz SKU'ları ve İsimleri Belirle
+        sku_name_map = {}
         for order in all_orders:
             items = (
                 order.get('lines') or
@@ -174,11 +192,23 @@ class SalesAnalytics:
                     item.get('productCode') or 
                     ''
                 )
+                sku = str(sku).strip()
+                
+                name = (
+                    item.get('name') or
+                    item.get('invoice_name') or
+                    item.get('productName') or 
+                    item.get('title') or 
+                    ''
+                )
+                
                 if sku:
-                    unique_skus.add(str(sku).strip())
+                    # Eğer isim varsa ve daha önce eklenmemişse veya daha uzunsa güncelle
+                    if sku not in sku_name_map or (name and len(name) > len(sku_name_map[sku])):
+                        sku_name_map[sku] = name
         
         # 3. Sadece Bu SKU'lar İçin Maliyetleri Çek
-        cost_map = self._fetch_costs_for_skus(unique_skus, progress_callback)
+        cost_map = self._fetch_costs_for_skus(sku_name_map, progress_callback)
         
         if progress_callback:
             progress_callback({

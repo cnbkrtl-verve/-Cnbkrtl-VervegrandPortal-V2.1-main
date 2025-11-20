@@ -593,3 +593,43 @@ class SentosAPI:
         
         logging.info(f"Sentos'tan toplam {len(all_orders)} sipariş çekildi.")
         return all_orders
+    
+    def get_product_by_name(self, name):
+        """Verilen Ürün Adına göre Sentos'tan ürün arar."""
+        if not name:
+            return None
+        endpoint = "/products"
+        # Sentos API'de isim araması genellikle 'name' veya 'q' parametresi ile yapılır.
+        # Dokümantasyon olmadığı için 'name' deniyoruz.
+        params = {'name': name.strip()} 
+        try:
+            response = self._make_request("GET", endpoint, params=params).json()
+            products = response.get('data', [])
+            if not products:
+                # Bir de 'q' parametresi ile deneyelim (genel arama)
+                params = {'q': name.strip()}
+                response = self._make_request("GET", endpoint, params=params).json()
+                products = response.get('data', [])
+            
+            if not products:
+                logging.warning(f"Sentos API'de '{name}' ismi ile ürün bulunamadı.")
+                return None
+            
+            # Tam eşleşme kontrolü (İsim için biraz daha esnek olabiliriz ama yine de dikkatli olalım)
+            target_name = name.strip().lower()
+            
+            for product in products:
+                p_name = str(product.get('name', '')).strip().lower()
+                if p_name == target_name:
+                    return product
+            
+            # Eğer tam isim eşleşmesi yoksa, ama sonuç varsa...
+            # Kullanıcı "birebir aynı" dediği için ilk sonucu döndürmek riskli olabilir.
+            # Ancak isim araması zaten spesifikse ilk sonuç doğru olabilir.
+            # Şimdilik tam eşleşme arayalım, bulamazsak None dönelim.
+            logging.warning(f"İsim '{name}' için tam eşleşme bulunamadı.")
+            return None
+            
+        except Exception as e:
+            logging.error(f"Sentos'ta İsim '{name}' aranırken hata: {e}")
+            return None

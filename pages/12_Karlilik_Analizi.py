@@ -144,16 +144,17 @@ if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
             progress_bar.progress(30)
             status_text.text(f"✅ {len(orders)} sipariş çekildi. SKU'lar analiz ediliyor...")
             
-            # 3. SKU'ları Belirle
-            unique_skus = set()
+            # 3. SKU'ları ve İsimleri Belirle
+            sku_name_map = {}
             for order in orders:
                 for item in order.get('lineItems', {}).get('nodes', []):
                     sku = str(item.get('variant', {}).get('sku', '')).strip()
+                    name = item.get('title', '')
                     if sku:
-                        unique_skus.add(sku)
+                        sku_name_map[sku] = name
             
             # 4. Maliyetleri Çek (Optimize Edilmiş)
-            status_text.text(f"🔍 {len(unique_skus)} farklı ürün için maliyetler Sentos'tan çekiliyor...")
+            status_text.text(f"🔍 {len(sku_name_map)} farklı ürün için maliyetler Sentos'tan çekiliyor...")
             
             # Progress callback adaptörü
             def cost_progress_callback(data):
@@ -166,7 +167,7 @@ if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
                     total_progress = base_progress + int((sub_progress / 100) * range_progress)
                     update_progress({'message': data.get('message'), 'progress': total_progress})
 
-            cost_map = sales_analytics._fetch_costs_for_skus(unique_skus, progress_callback=cost_progress_callback)
+            cost_map = sales_analytics._fetch_costs_for_skus(sku_name_map, progress_callback=cost_progress_callback)
             st.session_state.cost_map = cost_map
             
             progress_bar.progress(80)
