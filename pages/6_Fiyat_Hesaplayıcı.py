@@ -810,26 +810,41 @@ if st.session_state.calculated_df is not None:
             
             rule_value = col_rule2.number_input("Değer", min_value=0.0, step=1.0, value=10.0)
             
-            if st.button("Toplu Güncelleme Başlat", type="primary", disabled=st.session_state.update_in_progress):
-                st.warning("⚠️ Bu işlem seçili koleksiyondaki tüm ürünlerin fiyatlarını kalıcı olarak değiştirecektir!")
-                if st.checkbox("Evet, eminim ve onaylıyorum"):
-                    st.session_state.update_in_progress = True
-                    st.session_state.sync_progress_queue = queue.Queue()
-                    
-                    def run_collection_update():
-                        from operations.price_sync import update_collection_custom
-                        shopify_api = ShopifyAPI(st.session_state.shopify_store, st.session_state.shopify_token)
-                        result = update_collection_custom(
-                            shopify_api, 
-                            selected_collection_id, 
-                            rule_type[1], 
-                            rule_value, 
-                            progress_queue=st.session_state.sync_progress_queue
-                        )
-                        st.session_state.sync_progress_queue.put({"status": "done", "results": result})
+            # Session state initialization for confirmation
+            if 'confirm_collection_update' not in st.session_state:
+                st.session_state.confirm_collection_update = False
 
-                    threading.Thread(target=run_collection_update, daemon=True).start()
-                    st.rerun()
+            if st.button("Toplu Güncelleme Başlat", type="primary", disabled=st.session_state.update_in_progress):
+                st.session_state.confirm_collection_update = True
+            
+            if st.session_state.confirm_collection_update:
+                st.warning("⚠️ Bu işlem seçili koleksiyondaki tüm ürünlerin fiyatlarını kalıcı olarak değiştirecektir!")
+                col_conf1, col_conf2 = st.columns(2)
+                with col_conf1:
+                    if st.button("✅ Evet, Onaylıyorum", type="primary", key="btn_confirm_update"):
+                        st.session_state.confirm_collection_update = False # Reset
+                        st.session_state.update_in_progress = True
+                        st.session_state.sync_progress_queue = queue.Queue()
+                        
+                        def run_collection_update():
+                            from operations.price_sync import update_collection_custom
+                            shopify_api = ShopifyAPI(st.session_state.shopify_store, st.session_state.shopify_token)
+                            result = update_collection_custom(
+                                shopify_api, 
+                                selected_collection_id, 
+                                rule_type[1], 
+                                rule_value, 
+                                progress_queue=st.session_state.sync_progress_queue
+                            )
+                            st.session_state.sync_progress_queue.put({"status": "done", "results": result})
+
+                        threading.Thread(target=run_collection_update, daemon=True).start()
+                        st.rerun()
+                
+                with col_conf2:
+                    if st.button("❌ İptal", key="btn_cancel_update"):
+                        st.session_state.confirm_collection_update = False
+                        st.rerun()
 
 # Eğer bir işlem devam ediyorsa, ilerlemeyi gösteren alanı oluştur
 if st.session_state.update_in_progress:
