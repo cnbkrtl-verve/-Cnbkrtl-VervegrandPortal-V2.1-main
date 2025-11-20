@@ -314,10 +314,14 @@ def _run_price_sync(
         def fetch_progress(msg):
             queue.put({'progress': 10, 'message': msg})
             
-        current_shopify_data = shopify_api.get_all_products_prices(progress_callback=fetch_progress)
+        try:
+            current_shopify_data = shopify_api.get_all_products_prices(progress_callback=fetch_progress)
+        except Exception as e:
+            logging.error(f"Shopify veri çekme hatası: {e}")
+            raise ValueError(f"Shopify'dan fiyat verileri çekilemedi: {e}")
         
         if not current_shopify_data:
-            raise ValueError("Shopify'dan ürün verisi çekilemedi.")
+            raise ValueError("Shopify'dan ürün verisi çekilemedi (Liste boş).")
             
         queue.put({'progress': 20, 'message': 'Değişiklikler analiz ediliyor...'})
         
@@ -327,30 +331,6 @@ def _run_price_sync(
         skipped_count = 0
         total_variants_checked = 0
         
-        for item in current_shopify_data:
-            sku = str(item.get('sku', '')).strip()
-            # Varyant SKU'su veya Base SKU ile eşleşme ara
-            # Sentos'ta varyant SKU'su farklı olabilir, ama biz target_prices'ı MODEL KODU (Base SKU) üzerinden kurduk.
-            # Ancak varyantların kendi SKU'su varsa ve target_prices'da varsa onu kullan.
-            # Yoksa, varyant SKU'su Base SKU ile başlıyorsa Base SKU fiyatını kullan.
-            
-            target = target_prices.get(sku)
-            
-            # Eğer direkt SKU eşleşmesi yoksa, Base SKU kontrolü yap (prefix)
-            if not target:
-                # Bu kısım biraz riskli, SKU yapısına bağlı. 
-                # Ancak mevcut mantıkta "variant_sku.startswith(product_base_sku)" kullanılıyordu.
-                # Burada tersini yapıyoruz: SKU'nun hangi Base SKU'ya ait olduğunu bulmaya çalışıyoruz.
-                # Hız için: target_prices anahtarlarını looplamak yerine, SKU'yu parçalayıp bakabiliriz.
-                # Şimdilik tam eşleşme veya variants_df üzerinden lookup yapalım.
-                
-                # variants_df: base_sku, MODEL KODU (variant sku)
-                # Buradan variant sku -> base sku haritası çıkaralım
-                pass
-
-            # Daha güvenli yol: variants_df kullanarak map oluştur
-            # Bu map'i döngüden önce oluşturmalıydık.
-            
         # --- DIFF MANTIĞI REVİZE ---
         # variants_df kullanarak: Variant SKU -> Base SKU -> Target Price
         variant_to_price_map = {}
@@ -359,9 +339,12 @@ def _run_price_sync(
         base_sku_prices = target_prices # Base SKU -> Price
         
         # 2. Varyantların fiyatlarını belirle
+        # base_sku sütunu kontrolü
+        has_base_sku = 'base_sku' in variants_df.columns
+        
         for _, row in variants_df.iterrows():
             v_sku = str(row['MODEL KODU']).strip()
-            b_sku = str(row['base_sku']).strip()
+            b_sku = str(row['base_sku']).strip() if has_base_sku else v_sku
             
             if b_sku in base_sku_prices:
                 variant_to_price_map[v_sku] = base_sku_prices[b_sku]
