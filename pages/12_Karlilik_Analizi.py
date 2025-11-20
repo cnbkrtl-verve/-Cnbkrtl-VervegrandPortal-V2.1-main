@@ -184,12 +184,12 @@ if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
             # DEBUG: Maliyet Kontrolü
             with st.expander("🛠️ Geliştirici Detayları (Maliyet Kontrolü)"):
                 st.info("ℹ️ Sistem artık SKU ile bulamazsa Barkod ile de arama yapmaktadır.")
-                st.write(f"Toplam {len(unique_skus)} adet benzersiz SKU tarandı.")
+                st.write(f"Toplam {len(sku_name_map)} adet benzersiz SKU tarandı.")
                 st.write(f"Bulunan Maliyet Sayısı: {len(cost_map)}")
                 
                 # Maliyeti 0 olanları ve olmayanları ayır
                 found_costs = {k: v for k, v in cost_map.items() if v > 0}
-                missing_costs = [sku for sku in unique_skus if sku not in cost_map or cost_map[sku] == 0]
+                missing_costs = [sku for sku in sku_name_map.keys() if sku not in cost_map or cost_map[sku] == 0]
                 
                 c1, c2 = st.columns(2)
                 with c1:
