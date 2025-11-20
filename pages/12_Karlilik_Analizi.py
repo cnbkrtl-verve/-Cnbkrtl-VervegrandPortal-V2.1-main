@@ -15,7 +15,7 @@ if project_root not in sys.path:
 from utils.style_loader import load_global_css
 from connectors.shopify_api import ShopifyAPI
 from connectors.sentos_api import SentosAPI
-from gsheets_manager import load_pricing_data_from_gsheets
+from operations.sales_analytics import SalesAnalytics
 from config_manager import load_all_user_keys
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
@@ -24,35 +24,6 @@ st.set_page_config(page_title="Kârlılık Analizi", page_icon="💰", layout="w
 load_global_css()
 
 # --- Yardımcı Fonksiyonlar ---
-
-def process_cost_data(product_list):
-    """Sentos verisini maliyet sözlüğüne çevirir: SKU -> Alış Fiyatı"""
-    cost_map = {}
-    for p in product_list:
-        # Ana ürün
-        main_sku = str(p.get('sku', '')).strip()
-        try:
-            price = float(str(p.get('purchase_price') or p.get('AlisFiyati') or '0').replace(',', '.'))
-        except:
-            price = 0.0
-        
-        if main_sku:
-            cost_map[main_sku] = price
-            
-        # Varyantlar
-        for v in p.get('variants', []):
-            v_sku = str(v.get('sku', '')).strip()
-            try:
-                v_price = float(str(v.get('purchase_price') or v.get('AlisFiyati') or '0').replace(',', '.'))
-            except:
-                v_price = 0.0
-            
-            # Varyant fiyatı 0 ise ana ürün fiyatını kullan
-            final_price = v_price if v_price > 0 else price
-            if v_sku:
-                cost_map[v_sku] = final_price
-                
-    return cost_map
 
 def calculate_profitability(orders, cost_map, shipping_cost, vat_rate_purchase=10):
     """Siparişleri analiz eder ve kârlılık verilerini hesaplar."""
@@ -64,8 +35,6 @@ def calculate_profitability(orders, cost_map, shipping_cost, vat_rate_purchase=1
         
         # Gelirler
         total_price = float(order.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-        subtotal_price = float(order.get('currentSubtotalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-        total_discounts = float(order.get('totalDiscountsSet', {}).get('shopMoney', {}).get('amount', 0))
         
         # Maliyetler
         total_product_cost = 0
@@ -87,13 +56,6 @@ def calculate_profitability(orders, cost_map, shipping_cost, vat_rate_purchase=1
             items_details.append(f"{sku} (x{quantity})")
             
         # Kârlılık Hesaplama
-        # Brüt Kâr = Satış Cirosu (Subtotal) - Ürün Maliyeti (KDV'li)
-        # Not: Subtotal genellikle indirimler düşüldükten sonraki tutardır, ama vergi hariç olabilir.
-        # Shopify'da 'currentSubtotalPriceSet' genellikle vergi öncesi, indirim sonrası tutardır.
-        # Kullanıcı "satıştan çıkacağız" dediği için Total Price (KDV dahil, kargo dahil) mi yoksa Subtotal mi kullanmalı?
-        # Genellikle Brüt Kâr = Net Satışlar - SMM.
-        # Basitlik için: Total Price (Müşterinin ödediği) üzerinden gidelim, kargoyu gider düşelim.
-        
         gross_profit = total_price - total_product_cost
         net_profit = gross_profit - shipping_cost
         
@@ -125,61 +87,11 @@ if 'authentication_status' not in st.session_state or not st.session_state.authe
     st.stop()
 
 # Session State Başlatma
-if 'cost_map' not in st.session_state:
-    st.session_state.cost_map = {}
 if 'profit_df' not in st.session_state:
     st.session_state.profit_df = None
 
-# 1. Maliyet Verisi Yükleme
-with st.expander("1️⃣ Maliyet Verileri (Sentos/G-Sheets)", expanded=not bool(st.session_state.cost_map)):
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        if st.button("🔄 Sentos'tan Maliyetleri Çek", use_container_width=True):
-            with st.spinner("Sentos'tan güncel alış fiyatları çekiliyor..."):
-                try:
-                    user_keys = load_all_user_keys(st.session_state.username)
-                    sentos = SentosAPI(
-                        user_keys['sentos_api_url'],
-                        user_keys['sentos_api_key'],
-                        user_keys['sentos_api_secret'],
-                        user_keys['sentos_cookie']
-                    )
-                    products = sentos.get_all_products()
-                    if products:
-                        st.session_state.cost_map = process_cost_data(products)
-                        st.success(f"✅ {len(st.session_state.cost_map)} adet ürün maliyeti yüklendi.")
-                    else:
-                        st.error("Sentos'tan veri alınamadı.")
-                except Exception as e:
-                    st.error(f"Hata: {e}")
-
-    with c2:
-        if st.button("📄 G-Sheets'ten Maliyetleri Yükle", use_container_width=True):
-            with st.spinner("Google Sheets'ten yükleniyor..."):
-                try:
-                    main_df, variants_df = load_pricing_data_from_gsheets()
-                    cost_map = {}
-                    # Main DF
-                    if main_df is not None:
-                        for _, row in main_df.iterrows():
-                            cost_map[str(row['MODEL KODU']).strip()] = float(row.get('ALIŞ FİYATI', 0))
-                    # Variants DF
-                    if variants_df is not None:
-                        for _, row in variants_df.iterrows():
-                            cost_map[str(row['sku']).strip()] = float(row.get('purchase_price', 0))
-                    
-                    st.session_state.cost_map = cost_map
-                    st.success(f"✅ {len(cost_map)} adet ürün maliyeti yüklendi.")
-                except Exception as e:
-                    st.error(f"Hata: {e}")
-
-    if st.session_state.cost_map:
-        st.info(f"Hafızada {len(st.session_state.cost_map)} ürün için maliyet bilgisi mevcut.")
-
-# 2. Sipariş Analizi
-st.markdown("---")
-st.subheader("2️⃣ Sipariş Analizi")
+# Analiz Parametreleri
+st.subheader("⚙️ Analiz Ayarları")
 
 col_date1, col_date2, col_ship = st.columns(3)
 start_date = col_date1.date_input("Başlangıç Tarihi", datetime.now() - timedelta(days=7))
@@ -187,29 +99,84 @@ end_date = col_date2.date_input("Bitiş Tarihi", datetime.now())
 shipping_cost_input = col_ship.number_input("Sipariş Başı Kargo Gideri (TL)", value=85.0, step=5.0)
 
 if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
-    if not st.session_state.cost_map:
-        st.error("⚠️ Lütfen önce maliyet verilerini yükleyin (Adım 1).")
-    else:
-        with st.spinner("Shopify'dan siparişler çekiliyor ve analiz ediliyor..."):
-            try:
-                user_keys = load_all_user_keys(st.session_state.username)
-                shopify = ShopifyAPI(user_keys['shopify_store'], user_keys['shopify_token'])
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    def update_progress(data):
+        if isinstance(data, dict):
+            msg = data.get('message', '')
+            prog = data.get('progress', 0)
+            status_text.text(msg)
+            progress_bar.progress(min(prog, 100))
+            
+    try:
+        user_keys = load_all_user_keys(st.session_state.username)
+        
+        # 1. API Bağlantıları
+        status_text.text("🔌 API bağlantıları kuruluyor...")
+        shopify = ShopifyAPI(user_keys['shopify_store'], user_keys['shopify_token'])
+        sentos = SentosAPI(
+            user_keys['sentos_api_url'],
+            user_keys['sentos_api_key'],
+            user_keys['sentos_api_secret'],
+            user_keys['sentos_cookie']
+        )
+        sales_analytics = SalesAnalytics(sentos)
+        progress_bar.progress(10)
+        
+        # 2. Siparişleri Çek
+        status_text.text("📦 Shopify'dan siparişler çekiliyor...")
+        start_iso = datetime.combine(start_date, datetime.min.time()).isoformat()
+        end_iso = datetime.combine(end_date, datetime.max.time()).isoformat()
+        
+        orders = shopify.get_orders_by_date_range(start_iso, end_iso)
+        
+        if not orders:
+            status_text.text("⚠️ Seçilen tarih aralığında sipariş bulunamadı.")
+            st.warning("Seçilen tarih aralığında sipariş bulunamadı.")
+            progress_bar.progress(100)
+        else:
+            progress_bar.progress(30)
+            status_text.text(f"✅ {len(orders)} sipariş çekildi. SKU'lar analiz ediliyor...")
+            
+            # 3. SKU'ları Belirle
+            unique_skus = set()
+            for order in orders:
+                for item in order.get('lineItems', {}).get('nodes', []):
+                    sku = str(item.get('variant', {}).get('sku', '')).strip()
+                    if sku:
+                        unique_skus.add(sku)
+            
+            # 4. Maliyetleri Çek (Optimize Edilmiş)
+            status_text.text(f"🔍 {len(unique_skus)} farklı ürün için maliyetler Sentos'tan çekiliyor...")
+            
+            # Progress callback adaptörü
+            def cost_progress_callback(data):
+                # 30 ile 80 arası progress
+                base_progress = 30
+                range_progress = 50
                 
-                # Tarihleri ISO formatına çevir
-                start_iso = datetime.combine(start_date, datetime.min.time()).isoformat()
-                end_iso = datetime.combine(end_date, datetime.max.time()).isoformat()
-                
-                orders = shopify.get_orders_by_date_range(start_iso, end_iso)
-                
-                if not orders:
-                    st.warning("Seçilen tarih aralığında sipariş bulunamadı.")
-                else:
-                    df_profit = calculate_profitability(orders, st.session_state.cost_map, shipping_cost_input)
-                    st.session_state.profit_df = df_profit
-                    st.success(f"✅ {len(orders)} sipariş analiz edildi.")
-                    
-            except Exception as e:
-                st.error(f"Analiz sırasında hata: {e}")
+                if isinstance(data, dict):
+                    sub_progress = data.get('progress', 0)
+                    total_progress = base_progress + int((sub_progress / 100) * range_progress)
+                    update_progress({'message': data.get('message'), 'progress': total_progress})
+
+            cost_map = sales_analytics._fetch_costs_for_skus(unique_skus, progress_callback=cost_progress_callback)
+            
+            progress_bar.progress(80)
+            status_text.text("💰 Kârlılık hesaplanıyor...")
+            
+            # 5. Hesaplama
+            df_profit = calculate_profitability(orders, cost_map, shipping_cost_input)
+            st.session_state.profit_df = df_profit
+            
+            progress_bar.progress(100)
+            status_text.text("✅ Analiz tamamlandı!")
+            st.success(f"✅ {len(orders)} sipariş başarıyla analiz edildi.")
+            
+    except Exception as e:
+        st.error(f"Analiz sırasında hata: {e}")
+        status_text.text("❌ Hata oluştu.")
 
 # 3. Sonuçlar ve Görselleştirme
 if st.session_state.profit_df is not None and not st.session_state.profit_df.empty:

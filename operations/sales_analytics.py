@@ -7,6 +7,8 @@ E-Ticaret kanalından satış verilerini çeker ve detaylı analiz yapar
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+import concurrent.futures
+import time
 
 class SalesAnalytics:
     """Satış verilerini analiz eden sınıf"""
@@ -18,29 +20,52 @@ class SalesAnalytics:
         """
         self.sentos_api = sentos_api
     
-    def _build_cost_map(self):
-        """Sentos'tan ürünleri çekip maliyet haritası oluşturur"""
-        try:
-            logging.info("Maliyet verileri Sentos'tan çekiliyor...")
-            products = self.sentos_api.get_all_products()
-            cost_map = {}
-            if not products:
-                logging.warning("Sentos'tan ürün verisi çekilemedi veya boş.")
-                return {}
+    def _fetch_costs_for_skus(self, skus, progress_callback=None):
+        """
+        Verilen SKU listesi için Sentos'tan maliyet verilerini çeker.
+        Multi-threading kullanarak hızlandırılmıştır.
+        """
+        cost_map = {}
+        if not skus:
+            return cost_map
+            
+        total_skus = len(skus)
+        logging.info(f"Toplam {total_skus} adet benzersiz SKU için maliyet aranacak.")
+        
+        if progress_callback:
+            progress_callback({
+                'message': f'🔍 {total_skus} ürün için maliyet verileri taranıyor...',
+                'progress': 20
+            })
+
+        # ThreadPoolExecutor ile paralel çekim
+        # Sentos API rate limitine dikkat etmek için worker sayısını makul tutuyoruz
+        max_workers = 5 
+        
+        processed_count = 0
+        
+        def fetch_sku(sku):
+            try:
+                # Eğer bu SKU daha önce (başka bir varyant sorgusuyla) bulunduysa atla
+                if sku in cost_map:
+                    return
                 
-            for p in products:
-                # Ana ürün
-                main_sku = str(p.get('sku', '')).strip()
+                product = self.sentos_api.get_product_by_sku(sku)
+                if not product:
+                    return
+                
+                # Ana ürün maliyeti
+                main_sku = str(product.get('sku', '')).strip()
                 try:
-                    price = float(str(p.get('purchase_price') or p.get('AlisFiyati') or '0').replace(',', '.'))
+                    price = float(str(product.get('purchase_price') or product.get('AlisFiyati') or '0').replace(',', '.'))
                 except:
                     price = 0.0
                 
                 if main_sku:
                     cost_map[main_sku] = price
-                    
-                # Varyantlar
-                for v in p.get('variants', []):
+                
+                # Varyantların maliyetleri (Bir SKU sorgusu tüm varyantları getirebilir)
+                for v in product.get('variants', []):
                     v_sku = str(v.get('sku', '')).strip()
                     try:
                         v_price = float(str(v.get('purchase_price') or v.get('AlisFiyati') or '0').replace(',', '.'))
@@ -51,12 +76,25 @@ class SalesAnalytics:
                     final_price = v_price if v_price > 0 else price
                     if v_sku:
                         cost_map[v_sku] = final_price
+                        
+            except Exception as e:
+                logging.warning(f"SKU {sku} maliyeti çekilirken hata: {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Future'ları oluştur
+            future_to_sku = {executor.submit(fetch_sku, sku): sku for sku in skus}
             
-            logging.info(f"{len(cost_map)} adet ürün için maliyet bilgisi oluşturuldu.")
-            return cost_map
-        except Exception as e:
-            logging.error(f"Maliyet verileri çekilirken hata: {e}")
-            return {}
+            for i, future in enumerate(concurrent.futures.as_completed(future_to_sku)):
+                processed_count += 1
+                if progress_callback and processed_count % 5 == 0:
+                    progress = 20 + int((processed_count / total_skus) * 40) # 20% ile 60% arası
+                    progress_callback({
+                        'message': f'🔍 Maliyetler çekiliyor... ({processed_count}/{total_skus})',
+                        'progress': progress
+                    })
+        
+        logging.info(f"Maliyet taraması tamamlandı. {len(cost_map)} adet SKU için maliyet bulundu.")
+        return cost_map
 
     def analyze_sales_data(self, start_date=None, end_date=None, marketplace=None, 
                           progress_callback=None):
@@ -75,20 +113,11 @@ class SalesAnalytics:
         
         if progress_callback:
             progress_callback({
-                'message': '📊 Satış verileri çekiliyor...',
+                'message': '📦 Siparişler çekiliyor...',
                 'progress': 0
             })
         
-        # 1. Maliyet Verilerini Hazırla
-        cost_map = self._build_cost_map()
-        
-        if progress_callback:
-            progress_callback({
-                'message': '📦 Siparişler çekiliyor...',
-                'progress': 20
-            })
-
-        # 2. Tüm siparişleri çek
+        # 1. Önce Siparişleri Çek
         all_orders = self.sentos_api.get_all_sales_orders(
             start_date=start_date,
             end_date=end_date,
@@ -98,13 +127,36 @@ class SalesAnalytics:
         
         logging.info(f"Toplam {len(all_orders)} sipariş çekildi")
         
+        # 2. Siparişlerdeki Benzersiz SKU'ları Belirle
+        unique_skus = set()
+        for order in all_orders:
+            items = (
+                order.get('lines') or
+                order.get('items') or 
+                order.get('orderItems') or 
+                order.get('products') or 
+                []
+            )
+            for item in items:
+                sku = (
+                    item.get('sku') or
+                    item.get('barcode') or
+                    item.get('productCode') or 
+                    ''
+                )
+                if sku:
+                    unique_skus.add(str(sku).strip())
+        
+        # 3. Sadece Bu SKU'lar İçin Maliyetleri Çek
+        cost_map = self._fetch_costs_for_skus(unique_skus, progress_callback)
+        
         if progress_callback:
             progress_callback({
                 'message': '📈 Veriler analiz ediliyor...',
                 'progress': 60
             })
         
-        # 3. Analiz yap
+        # 4. Analiz yap
         analysis = self._analyze_orders(all_orders, cost_map, progress_callback)
         
         if progress_callback:
@@ -183,7 +235,7 @@ class SalesAnalytics:
             if progress_callback and idx % 100 == 0:
                 progress_callback({
                     'message': f'📈 Sipariş {idx + 1}/{total} analiz ediliyor...',
-                    'progress': 60 + int((idx / total) * 30)
+                    'progress': 60 + int((idx / total) * 40)
                 })
             
             self._process_order(
