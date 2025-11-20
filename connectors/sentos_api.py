@@ -155,6 +155,23 @@ class SentosAPI:
             logging.error(f"Sentos'ta SKU '{sku}' aranırken hata: {e}")
             raise
 
+    def get_product_by_barcode(self, barcode):
+        """Verilen Barkoda göre Sentos'tan tek bir ürün çeker."""
+        if not barcode:
+            return None
+        endpoint = f"/products?barcode={barcode.strip()}"
+        try:
+            response = self._make_request("GET", endpoint).json()
+            products = response.get('data', [])
+            if not products:
+                logging.warning(f"Sentos API'de '{barcode}' barkodu ile ürün bulunamadı.")
+                return None
+            
+            return products[0]
+        except Exception as e:
+            logging.error(f"Sentos'ta Barkod '{barcode}' aranırken hata: {e}")
+            return None
+
     def get_warehouses(self):
         """
         YENİ FONKSİYON: Sentos'taki tüm depoları çeker.

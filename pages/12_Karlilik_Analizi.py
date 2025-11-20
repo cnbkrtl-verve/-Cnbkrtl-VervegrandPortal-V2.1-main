@@ -176,6 +176,7 @@ if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
             
             # DEBUG: Maliyet Kontrolü
             with st.expander("🛠️ Geliştirici Detayları (Maliyet Kontrolü)"):
+                st.info("ℹ️ Sistem artık SKU ile bulamazsa Barkod ile de arama yapmaktadır.")
                 st.write(f"Toplam {len(unique_skus)} adet benzersiz SKU tarandı.")
                 st.write(f"Bulunan Maliyet Sayısı: {len(cost_map)}")
                 

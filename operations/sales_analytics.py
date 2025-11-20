@@ -51,6 +51,11 @@ class SalesAnalytics:
                     return
                 
                 product = self.sentos_api.get_product_by_sku(sku)
+                
+                # Fallback: SKU ile bulunamadıysa Barkod ile ara
+                if not product:
+                    product = self.sentos_api.get_product_by_barcode(sku)
+                    
                 if not product:
                     logging.warning(f"SKU {sku} için ürün bulunamadı.")
                     return
@@ -60,6 +65,7 @@ class SalesAnalytics:
                 
                 # Ana ürün maliyeti
                 main_sku = str(product.get('sku', '')).strip()
+                main_barcode = str(product.get('barcode', '')).strip()
                 
                 # Fiyat Parse Etme Fonksiyonu
                 def parse_price(val):
@@ -81,16 +87,21 @@ class SalesAnalytics:
                 if main_sku:
                     cost_map[main_sku] = price
                     logging.info(f"SKU {main_sku} Maliyet: {price}")
+                if main_barcode:
+                    cost_map[main_barcode] = price
                 
                 # Varyantların maliyetleri (Bir SKU sorgusu tüm varyantları getirebilir)
                 for v in product.get('variants', []):
                     v_sku = str(v.get('sku', '')).strip()
+                    v_barcode = str(v.get('barcode', '')).strip()
                     v_price = parse_price(v.get('purchase_price') or v.get('AlisFiyati'))
                     
                     # Varyant fiyatı 0 ise ana ürün fiyatını kullan
                     final_price = v_price if v_price > 0 else price
                     if v_sku:
                         cost_map[v_sku] = final_price
+                    if v_barcode:
+                        cost_map[v_barcode] = final_price
                         # logging.info(f"Varyant SKU {v_sku} Maliyet: {final_price}")
                         
             except Exception as e:
@@ -290,16 +301,34 @@ class SalesAnalytics:
         summary['net_revenue'] = summary['gross_revenue'] - summary['return_amount']
         summary['gross_profit'] = summary['net_revenue'] - summary['total_cost']
         
+        # Kargo Gideri ve Net Kar Hesaplama (Sipariş başı 85 TL)
+        shipping_cost_per_order = 85.0
+        summary['total_shipping_cost'] = summary['total_orders'] * shipping_cost_per_order
+        summary['net_profit_real'] = summary['gross_profit'] - summary['total_shipping_cost']
+        
         if summary['net_revenue'] > 0:
             summary['profit_margin'] = (summary['gross_profit'] / summary['net_revenue']) * 100
+            summary['net_profit_margin'] = (summary['net_profit_real'] / summary['net_revenue']) * 100
+        else:
+            summary['profit_margin'] = 0
+            summary['net_profit_margin'] = 0
         
         # Pazar yeri bazında net hesaplamalar
         for mp_data in by_marketplace.values():
             mp_data['net_quantity'] = mp_data['gross_quantity'] - mp_data['return_quantity']
             mp_data['net_revenue'] = mp_data['gross_revenue'] - mp_data['return_amount']
             mp_data['gross_profit'] = mp_data['net_revenue'] - mp_data['total_cost']
+            
+            # Pazar yeri bazlı kargo ve net kar
+            mp_data['total_shipping_cost'] = mp_data['order_count'] * shipping_cost_per_order
+            mp_data['net_profit_real'] = mp_data['gross_profit'] - mp_data['total_shipping_cost']
+            
             if mp_data['net_revenue'] > 0:
                 mp_data['profit_margin'] = (mp_data['gross_profit'] / mp_data['net_revenue']) * 100
+                mp_data['net_profit_margin'] = (mp_data['net_profit_real'] / mp_data['net_revenue']) * 100
+            else:
+                mp_data['profit_margin'] = 0
+                mp_data['net_profit_margin'] = 0
         
         # Tarih bazında net hesaplamalar
         for date_data in by_date.values():
@@ -437,6 +466,8 @@ class SalesAnalytics:
                 
                 # Maliyet Bulma (Cost Map'ten)
                 unit_cost = cost_map.get(sku, 0.0)
+                # KDV Ekleme (+%10)
+                unit_cost = unit_cost * 1.10
                 total_cost = unit_cost * quantity
                 
             except (ValueError, TypeError) as e:

@@ -288,13 +288,13 @@ if 'analysis_result' in st.session_state:
     # --- KARLILIK KARTLARI ---
     st.header("💰 Karlılık Analizi")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.metric(
-            "Toplam Maliyet",
+            "Toplam Maliyet (+KDV)",
             f"₺{summary['total_cost']:,.2f}",
-            help="Satılan ürünlerin toplam maliyeti"
+            help="Satılan ürünlerin toplam maliyeti (%10 KDV dahil)"
         )
     
     with col2:
@@ -303,22 +303,27 @@ if 'analysis_result' in st.session_state:
             f"₺{summary['gross_profit']:,.2f}",
             help="Net Ciro - Toplam Maliyet"
         )
-    
+        
     with col3:
-        profit_color = "normal" if summary['profit_margin'] >= 20 else "inverse"
         st.metric(
-            "Kar Marjı",
-            f"%{summary['profit_margin']:.2f}",
-            help="(Brüt Kar / Net Ciro) × 100"
+            "Toplam Kargo",
+            f"₺{summary.get('total_shipping_cost', 0):,.2f}",
+            help="Toplam Sipariş x 85 TL"
         )
-    
+        
     with col4:
         st.metric(
-            "İade Oranı",
-            f"%{returns['return_rate']:.2f}",
-            delta=f"{int(summary['return_quantity'])} adet",
-            delta_color="inverse",
-            help="İade edilen ürün oranı"
+            "Net Kar",
+            f"₺{summary.get('net_profit_real', 0):,.2f}",
+            help="Brüt Kar - Toplam Kargo"
+        )
+    
+    with col5:
+        profit_color = "normal" if summary.get('net_profit_margin', 0) >= 15 else "inverse"
+        st.metric(
+            "Net Kar Marjı",
+            f"%{summary.get('net_profit_margin', 0):.2f}",
+            help="(Net Kar / Net Ciro) × 100"
         )
     
     st.divider()
