@@ -592,6 +592,9 @@ class ShopifyAPI:
                   id
                   title
                   handle
+                  vendor
+                  productType
+                  tags
                   variants(first: 50) {
                     edges {
                       node {
@@ -2078,7 +2081,7 @@ class ShopifyAPI:
                     return {'success': False, 'error': errors}
             
             created = result.get('metafieldDefinitionCreate', {}).get('createdDefinition', {})
-            definition_id = created.get('id')
+            definition_id = created.get('id');
             
             logging.info(f"✅ Metafield definition oluşturuldu: {namespace}.{key} → '{name}'")
             return {'success': True, 'definition_id': definition_id}
@@ -2253,3 +2256,64 @@ class ShopifyAPI:
         except Exception as e:
             logging.error(f"Ürün arama hatası: {e}")
             return []
+
+    def get_all_products_prices(self, progress_callback=None):
+        """
+        Fiyat güncellemesi için tüm ürünlerin ID, SKU ve Fiyat bilgilerini çeker.
+        """
+        all_products = []
+        query = """
+        query getProductsPrices($cursor: String) {
+          products(first: 50, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            edges {
+              node {
+                id
+                variants(first: 100) {
+                  edges {
+                    node {
+                      id
+                      sku
+                      price
+                      compareAtPrice
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        variables = {"cursor": None}
+        total_fetched = 0
+        
+        while True:
+            if progress_callback:
+                progress_callback(f"Shopify'dan mevcut fiyatlar çekiliyor... {total_fetched} ürün tarandı.")
+                
+            data = self.execute_graphql(query, variables)
+            products_data = data.get("products", {})
+            
+            for edge in products_data.get("edges", []):
+                node = edge["node"]
+                product_id = node["id"]
+                
+                for v_edge in node.get("variants", {}).get("edges", []):
+                    v_node = v_edge["node"]
+                    all_products.append({
+                        "product_id": product_id,
+                        "variant_id": v_node["id"],
+                        "sku": v_node["sku"],
+                        "price": v_node["price"],
+                        "compare_at_price": v_node["compareAtPrice"]
+                    })
+            
+            total_fetched += len(products_data.get("edges", []))
+            
+            if not products_data.get("pageInfo", {}).get("hasNextPage"):
+                break
+                
+            variables["cursor"] = products_data["pageInfo"]["endCursor"]
+            
+        logging.info(f"Fiyat kontrolü için toplam {len(all_products)} varyant çekildi.")
+        return all_products

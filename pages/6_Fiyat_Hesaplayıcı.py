@@ -275,115 +275,203 @@ def _run_price_sync(
     update_choice, worker_count, queue, **kwargs
 ):
     """
-    10 WORKER OPTİMİZE EDİLMİŞ: Hızlı ve throttle-safe
+    10 WORKER OPTİMİZE EDİLMİŞ: Bulk Fetch + In-Memory Diff + Threaded Update
     """
     try:
         safe_settings = get_safe_thread_settings()
-        
-        # 10 worker'a kadar izin ver
         actual_worker_count = min(worker_count, 10)
         
-        logging.info(f"10-Worker sistemi aktif: {actual_worker_count} worker, adaptive rate limiting")
+        logging.info(f"10-Worker sistemi aktif: {actual_worker_count} worker")
         
         import pandas as pd
-        
         shopify_api = ShopifyAPI(shopify_store, shopify_token)
         
+        # 1. HEDEF FİYATLARI HAZIRLA
         price_data_df = retail_df if update_choice == "İndirimli Fiyatlar" else calculated_df
         price_col = 'İNDİRİMLİ SATIŞ FİYATI' if update_choice == "İndirimli Fiyatlar" else 'NIHAI_SATIS_FIYATI'
         compare_col = 'NIHAI_SATIS_FIYATI' if update_choice == "İndirimli Fiyatlar" else None
 
         if variants_df is None or price_data_df is None:
             raise ValueError("Güncelleme için veri bulunamadı.")
-        
-        products_to_update_df = variants_df[['base_sku']].drop_duplicates()
-        total_products = len(products_to_update_df)
-        
-        if total_products == 0:
-            raise ValueError("Güncellenecek ürün bulunamadı.")
             
-        queue.put({'progress': 5, 'message': f'{total_products} ürün için 10-Worker sistemi başlatılıyor...'})
+        # Fiyat haritası oluştur: SKU -> {price, compare_at}
+        target_prices = {}
+        for _, row in price_data_df.iterrows():
+            sku = str(row['MODEL KODU']).strip()
+            try:
+                price = float(row[price_col])
+                compare = float(row[compare_col]) if compare_col and pd.notna(row.get(compare_col)) else None
+                target_prices[sku] = {'price': price, 'compare': compare}
+            except (ValueError, TypeError):
+                continue
+                
+        # Varyant tablosundan da ekle (Eğer ana tabloda yoksa)
+        # Not: Genellikle ana tablo yeterlidir ama varyant bazlı fiyat varsa buraya eklenebilir.
         
-        processed_products, success_count, failed_count = 0, 0, 0
+        queue.put({'progress': 5, 'message': 'Mevcut Shopify fiyatları çekiliyor (Bulk)...'})
+        
+        # 2. MEVCUT SHOPIFY VERİLERİNİ ÇEK (BULK)
+        def fetch_progress(msg):
+            queue.put({'progress': 10, 'message': msg})
+            
+        current_shopify_data = shopify_api.get_all_products_prices(progress_callback=fetch_progress)
+        
+        if not current_shopify_data:
+            raise ValueError("Shopify'dan ürün verisi çekilemedi.")
+            
+        queue.put({'progress': 20, 'message': 'Değişiklikler analiz ediliyor...'})
+        
+        # 3. DIFF ANALİZİ (Hangi ürünler güncellenmeli?)
+        products_to_update = defaultdict(list) # product_id -> [variant_updates]
+        
+        skipped_count = 0
+        total_variants_checked = 0
+        
+        for item in current_shopify_data:
+            sku = str(item.get('sku', '')).strip()
+            # Varyant SKU'su veya Base SKU ile eşleşme ara
+            # Sentos'ta varyant SKU'su farklı olabilir, ama biz target_prices'ı MODEL KODU (Base SKU) üzerinden kurduk.
+            # Ancak varyantların kendi SKU'su varsa ve target_prices'da varsa onu kullan.
+            # Yoksa, varyant SKU'su Base SKU ile başlıyorsa Base SKU fiyatını kullan.
+            
+            target = target_prices.get(sku)
+            
+            # Eğer direkt SKU eşleşmesi yoksa, Base SKU kontrolü yap (prefix)
+            if not target:
+                # Bu kısım biraz riskli, SKU yapısına bağlı. 
+                # Ancak mevcut mantıkta "variant_sku.startswith(product_base_sku)" kullanılıyordu.
+                # Burada tersini yapıyoruz: SKU'nun hangi Base SKU'ya ait olduğunu bulmaya çalışıyoruz.
+                # Hız için: target_prices anahtarlarını looplamak yerine, SKU'yu parçalayıp bakabiliriz.
+                # Şimdilik tam eşleşme veya variants_df üzerinden lookup yapalım.
+                
+                # variants_df: base_sku, MODEL KODU (variant sku)
+                # Buradan variant sku -> base sku haritası çıkaralım
+                pass
+
+            # Daha güvenli yol: variants_df kullanarak map oluştur
+            # Bu map'i döngüden önce oluşturmalıydık.
+            
+        # --- DIFF MANTIĞI REVİZE ---
+        # variants_df kullanarak: Variant SKU -> Base SKU -> Target Price
+        variant_to_price_map = {}
+        
+        # 1. Ana ürün fiyatlarını al
+        base_sku_prices = target_prices # Base SKU -> Price
+        
+        # 2. Varyantların fiyatlarını belirle
+        for _, row in variants_df.iterrows():
+            v_sku = str(row['MODEL KODU']).strip()
+            b_sku = str(row['base_sku']).strip()
+            
+            if b_sku in base_sku_prices:
+                variant_to_price_map[v_sku] = base_sku_prices[b_sku]
+        
+        # 3. Şimdi Shopify verilerini tara
+        for item in current_shopify_data:
+            total_variants_checked += 1
+            sku = str(item.get('sku', '')).strip()
+            product_id = item.get('product_id')
+            variant_id = item.get('variant_id')
+            current_price = float(item.get('price', 0))
+            current_compare = float(item.get('compare_at_price')) if item.get('compare_at_price') else None
+            
+            target = variant_to_price_map.get(sku)
+            
+            # Eğer varyant SKU'su listede yoksa, belki ana SKU'dur?
+            if not target and sku in base_sku_prices:
+                target = base_sku_prices[sku]
+            
+            if target:
+                new_price = target['price']
+                new_compare = target['compare']
+                
+                # Değişiklik var mı?
+                price_changed = abs(current_price - new_price) > 0.01
+                compare_changed = False
+                if new_compare is not None:
+                    if current_compare is None:
+                        compare_changed = True
+                    else:
+                        compare_changed = abs(current_compare - new_compare) > 0.01
+                elif current_compare is not None:
+                    # Yeni compare yok ama eskisi var -> silinmeli mi? 
+                    # Mevcut mantıkta compare silme yok, sadece varsa güncelleme var.
+                    pass
+                
+                if price_changed or compare_changed:
+                    payload = {"id": variant_id, "price": f"{new_price:.2f}"}
+                    if new_compare is not None:
+                        payload["compareAtPrice"] = f"{new_compare:.2f}"
+                    
+                    products_to_update[product_id].append(payload)
+                else:
+                    skipped_count += 1
+        
+        total_products_to_update = len(products_to_update)
+        queue.put({'progress': 30, 'message': f'Analiz tamamlandı. {total_products_to_update} ürün güncellenecek. ({skipped_count} varyant atlandı)'})
+        
+        if total_products_to_update == 0:
+            queue.put({
+                "status": "done", 
+                "results": {
+                    "success": 0, "failed": 0, "details": [],
+                    "avg_rate": "0", "total_time": "0"
+                }
+            })
+            return
+
+        # 4. GÜNCELLEME (THREADED)
+        processed_count = 0
+        success_count = 0
+        failed_count = 0
         failed_details = []
         start_time = time.time()
         
-        # Smart rate limiter - 10 worker için optimize edilmiş
-        from operations.price_sync import SmartRateLimiter
+        from operations.price_sync import SmartRateLimiter, update_prices_for_single_product
         rate_limiter = SmartRateLimiter(max_requests_per_second=2.5, burst_capacity=15)
         
         with ThreadPoolExecutor(max_workers=actual_worker_count) as executor:
-            from operations.price_sync import _process_one_product_for_price_sync
-            
+            # Future -> Product ID map
             futures = {
                 executor.submit(
-                    _process_one_product_for_price_sync, 
-                    shopify_api, row['base_sku'], variants_df, 
-                    price_data_df, price_col, compare_col, rate_limiter
-                ): row['base_sku'] 
-                for index, row in products_to_update_df.iterrows()
+                    update_prices_for_single_product, 
+                    shopify_api, p_id, updates, rate_limiter
+                ): p_id 
+                for p_id, updates in products_to_update.items()
             }
             
             for future in as_completed(futures):
-                processed_products += 1
-                base_sku = futures[future]
+                processed_count += 1
+                p_id = futures[future]
                 
                 try:
                     result = future.result()
-                    
                     if result.get('status') == 'success':
                         success_count += 1
-                        queue.put({
-                            'log_detail': f"✅ {base_sku}: {result.get('updated_count', 0)} varyant güncellendi"
-                        })
+                        # queue.put({'log_detail': f"✅ Ürün {p_id}: Güncellendi"})
                     else:
                         failed_count += 1
-                        failed_details.append({
-                            "sku": base_sku,
-                            "status": "failed",
-                            "reason": result.get('reason', 'Bilinmeyen hata')
-                        })
-                        queue.put({
-                            'log_detail': f"❌ {base_sku}: {result.get('reason', 'Bilinmeyen hata')}"
-                        })
-                        
+                        failed_details.append({"sku": f"GID-{p_id}", "status": "failed", "reason": result.get('reason')})
+                        queue.put({'log_detail': f"❌ Ürün {p_id}: {result.get('reason')}"})
                 except Exception as e:
                     failed_count += 1
-                    failed_details.append({
-                        "sku": base_sku,
-                        "status": "failed", 
-                        "reason": f"Worker hatası: {str(e)}"
-                    })
+                    queue.put({'log_detail': f"❌ Ürün {p_id}: Hata - {e}"})
+                
+                # İstatistikler
+                elapsed = time.time() - start_time
+                rate = processed_count / elapsed if elapsed > 0 else 0
+                eta = (total_products_to_update - processed_count) / rate / 60 if rate > 0 else 0
+                
+                if processed_count % 5 == 0 or processed_count == total_products_to_update:
+                    progress = 30 + int((processed_count / total_products_to_update) * 70)
                     queue.put({
-                        'log_detail': f"❌ {base_sku}: Worker hatası - {str(e)}"
+                        'progress': progress,
+                        'message': f'Güncelleniyor: {processed_count}/{total_products_to_update} (Hız: {rate:.1f}/sn)',
+                        'stats': {'rate': rate, 'eta': eta, 'success': success_count, 'failed': failed_count}
                     })
-                
-                # Gerçek zamanlı istatistikler
-                elapsed_time = time.time() - start_time
-                if elapsed_time > 0:
-                    rate = processed_products / elapsed_time
-                    eta_minutes = (total_products - processed_products) / max(rate, 0.1) / 60
-                else:
-                    rate = 0
-                    eta_minutes = 0
-                
-                progress_percent = 10 + int((processed_products / total_products) * 85)
-                queue.put({
-                    'progress': progress_percent,
-                    'message': f'10-Worker: {processed_products}/{total_products} (✅{success_count} ❌{failed_count})',
-                    'stats': {
-                        'processed': processed_products,
-                        'total': total_products,
-                        'success': success_count,
-                        'failed': failed_count,
-                        'rate': rate,
-                        'eta': eta_minutes
-                    }
-                })
 
-        # Final sonuçlar
         total_time = time.time() - start_time
-        avg_rate = processed_products / total_time if total_time > 0 else 0
+        avg_rate = processed_count / total_time if total_time > 0 else 0
         
         queue.put({
             "status": "done", 
@@ -397,7 +485,7 @@ def _run_price_sync(
         })
 
     except Exception as e:
-        logging.error(f"10-Worker sistem hatası: {traceback.format_exc()}")
+        logging.error(f"Sync hatası: {traceback.format_exc()}")
         queue.put({"status": "error", "message": str(e)})
 
 # --- ARAYÜZ ---
