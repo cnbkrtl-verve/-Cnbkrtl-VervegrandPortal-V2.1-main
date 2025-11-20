@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import concurrent.futures
 import time
+import re
 
 class SalesAnalytics:
     """Satış verilerini analiz eden sınıf"""
@@ -73,9 +74,36 @@ class SalesAnalytics:
                     # İsim boş değilse ara
                     if name and len(name) > 3:
                         product = self.sentos_api.get_product_by_name(name)
-                    
+                
+                # Fallback 3: Model Kodu ile Ara (YENİ)
                 if not product:
-                    logging.warning(f"SKU {sku} için ürün bulunamadı (SKU, Barkod ve İsim denendi).")
+                    # Model kodunu SKU'dan veya İsimden çıkarmaya çalış
+                    model_code = None
+                    
+                    # 1. SKU'dan çıkar (Örn: BYK-24Y-303080-M51-R15 -> 303080)
+                    # Genellikle 6 haneli sayı, tire veya boşlukla çevrili olabilir
+                    match = re.search(r'[- ](\d{6})[- ]', sku)
+                    if not match:
+                         # Belki SKU direkt model kodudur veya tire ile bitiyordur
+                         match = re.search(r'[- ]?(\d{6})[- ]?', sku)
+                    
+                    if match:
+                        model_code = match.group(1)
+                    
+                    # 2. İsimden çıkar (Örn: ... Bluz 303080 -> 303080)
+                    if not model_code and sku in sku_name_map:
+                        name = sku_name_map[sku]
+                        # İsim sonunda veya içinde 6 haneli sayı
+                        match = re.search(r'\b(\d{6})\b', name)
+                        if match:
+                            model_code = match.group(1)
+                    
+                    if model_code:
+                        # logging.info(f"SKU {sku} için Model Kodu denenecek: {model_code}")
+                        product = self.sentos_api.get_product_by_model_code(model_code)
+
+                if not product:
+                    logging.warning(f"SKU {sku} için ürün bulunamadı (SKU, Barkod, İsim ve Model Kodu denendi).")
                     return
                 
                 # Debug: Ürün verisini logla

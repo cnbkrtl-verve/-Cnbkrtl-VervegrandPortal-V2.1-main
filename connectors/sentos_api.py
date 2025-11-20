@@ -599,14 +599,15 @@ class SentosAPI:
         if not name:
             return None
         endpoint = "/products"
-        # Sentos API'de isim araması genellikle 'name' veya 'q' parametresi ile yapılır.
-        # Dokümantasyon olmadığı için 'name' deniyoruz.
-        params = {'name': name.strip()} 
+        
         try:
+            # 1. 'name' parametresi ile arama
+            params = {'name': name.strip()} 
             response = self._make_request("GET", endpoint, params=params).json()
             products = response.get('data', [])
+            
+            # 2. 'q' parametresi ile arama (Fallback)
             if not products:
-                # Bir de 'q' parametresi ile deneyelim (genel arama)
                 params = {'q': name.strip()}
                 response = self._make_request("GET", endpoint, params=params).json()
                 products = response.get('data', [])
@@ -615,21 +616,56 @@ class SentosAPI:
                 logging.warning(f"Sentos API'de '{name}' ismi ile ürün bulunamadı.")
                 return None
             
-            # Tam eşleşme kontrolü (İsim için biraz daha esnek olabiliriz ama yine de dikkatli olalım)
             target_name = name.strip().lower()
             
+            # A. Tam Eşleşme
             for product in products:
                 p_name = str(product.get('name', '')).strip().lower()
                 if p_name == target_name:
                     return product
             
-            # Eğer tam isim eşleşmesi yoksa, ama sonuç varsa...
-            # Kullanıcı "birebir aynı" dediği için ilk sonucu döndürmek riskli olabilir.
-            # Ancak isim araması zaten spesifikse ilk sonuç doğru olabilir.
-            # Şimdilik tam eşleşme arayalım, bulamazsak None dönelim.
-            logging.warning(f"İsim '{name}' için tam eşleşme bulunamadı.")
+            # B. İçerme Kontrolü (Sentos ismi Shopify isminin içindeyse veya tam tersi)
+            # Çok kısa isimlerde hata yapmamak için uzunluk kontrolü
+            for product in products:
+                p_name = str(product.get('name', '')).strip().lower()
+                if len(p_name) > 4 and (p_name in target_name or target_name in p_name):
+                    logging.info(f"İsim benzerliği ile eşleşme bulundu: {p_name} <-> {target_name}")
+                    return product
+            
+            logging.warning(f"İsim '{name}' için uygun eşleşme bulunamadı.")
             return None
             
         except Exception as e:
             logging.error(f"Sentos'ta İsim '{name}' aranırken hata: {e}")
+            return None
+
+    def get_product_by_model_code(self, model_code):
+        """Model koduna göre ürün arar (örn: 303080)."""
+        if not model_code or len(model_code) < 3:
+            return None
+            
+        endpoint = "/products"
+        params = {'q': model_code.strip()}
+        try:
+            response = self._make_request("GET", endpoint, params=params).json()
+            products = response.get('data', [])
+            
+            if not products:
+                return None
+                
+            # Model kodu SKU, Barkod veya İsim içinde geçiyor mu?
+            target_code = model_code.strip().lower()
+            
+            for product in products:
+                p_sku = str(product.get('sku', '')).strip().lower()
+                p_barcode = str(product.get('barcode', '')).strip().lower()
+                p_name = str(product.get('name', '')).strip().lower()
+                
+                # Model kodu genellikle SKU'nun veya ismin bir parçasıdır
+                if target_code in p_sku or target_code in p_barcode or target_code in p_name:
+                    return product
+                    
+            return None
+        except Exception as e:
+            logging.error(f"Sentos'ta Model Kodu '{model_code}' aranırken hata: {e}")
             return None
