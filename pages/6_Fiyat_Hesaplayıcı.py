@@ -804,7 +804,8 @@ if st.session_state.calculated_df is not None:
             rule_type = col_rule1.selectbox("İşlem Tipi", [
                 ("Yüzde Artır (%)", "percentage_inc"),
                 ("Yüzde İndir (%)", "percentage_dec"),
-                ("Sabit Tutar Ekle (+TL)", "fixed_amount")
+                ("Sabit Tutar Ekle (+TL)", "fixed_amount"),
+                ("İndirim Oranını Ayarla (%)", "set_discount_rate")
             ], format_func=lambda x: x[0])
             
             rule_value = col_rule2.number_input("Değer", min_value=0.0, step=1.0, value=10.0)

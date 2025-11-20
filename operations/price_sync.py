@@ -350,6 +350,14 @@ def update_collection_custom(shopify_api, collection_id, adjustment_type, value,
                     new_price = current_price * (1 - value / 100)
                 elif adjustment_type == 'fixed_amount':
                     new_price = current_price + value
+                elif adjustment_type == 'set_discount_rate':
+                    # İndirim oranını ayarla (Compare At Price üzerinden)
+                    compare_at = float(variant.get('compareAtPrice') or 0)
+                    if compare_at > 0:
+                        new_price = compare_at * (1 - value / 100)
+                    else:
+                        # Compare At Price yoksa işlem yapma (veya mevcut fiyatı koru)
+                        continue
                 
                 # Yuvarlama (X.99)
                 import math
