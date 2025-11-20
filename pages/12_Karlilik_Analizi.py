@@ -191,10 +191,67 @@ if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
                 with c2:
                     st.write("⚠️ Maliyeti Bulunamayanlar/Sıfır Olanlar (Örnek 20):")
                     st.write(missing_costs[:20])
+
+            # --- YENİ: Detaylı Sipariş Analizi ---
+            st.divider()
+            st.subheader("🔍 Detaylı Sipariş İnceleme")
+            
+            selected_order_name = st.selectbox(
+                "İncelemek istediğiniz siparişi seçin:",
+                options=[o.get('name') for o in orders],
+                index=0 if orders else None
+            )
+            
+            if selected_order_name:
+                selected_order = next((o for o in orders if o.get('name') == selected_order_name), None)
+                if selected_order:
+                    st.write(f"**Sipariş:** {selected_order_name}")
+                    
+                    # Gelir
+                    total_price = float(selected_order.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+                    st.write(f"**Toplam Tutar (Ciro):** {total_price:,.2f} ₺")
+                    
+                    # Kalemler
+                    items_data = []
+                    total_calc_cost = 0
+                    
+                    for item in selected_order.get('lineItems', {}).get('nodes', []):
+                        sku = str(item.get('variant', {}).get('sku', '')).strip()
+                        quantity = int(item.get('quantity', 0))
+                        title = item.get('title', '')
+                        
+                        unit_cost_raw = cost_map.get(sku, 0.0)
+                        unit_cost_vat = unit_cost_raw * 1.10
+                        line_cost = unit_cost_vat * quantity
+                        total_calc_cost += line_cost
+                        
+                        items_data.append({
+                            "Ürün": title,
+                            "SKU": sku,
+                            "Adet": quantity,
+                            "Birim Maliyet (Ham)": f"{unit_cost_raw:,.2f} ₺",
+                            "Birim Maliyet (+KDV)": f"{unit_cost_vat:,.2f} ₺",
+                            "Toplam Maliyet": f"{line_cost:,.2f} ₺"
+                        })
+                    
+                    st.table(items_data)
+                    
+                    st.write(f"**Hesaplanan Toplam Ürün Maliyeti:** {total_calc_cost:,.2f} ₺")
+                    st.write(f"**Kargo Gideri:** {shipping_cost_input:,.2f} ₺")
+                    
+                    net_profit = total_price - total_calc_cost - shipping_cost_input
+                    st.metric("Bu Sipariş İçin Net Kâr", f"{net_profit:,.2f} ₺", delta_color="normal" if net_profit > 0 else "inverse")
+                    
+                    if net_profit < 0:
+                        st.error(f"⚠️ Bu siparişte {abs(net_profit):,.2f} ₺ zarar görünüyor. Lütfen yukarıdaki tablodan birim maliyetleri kontrol edin.")
+                        st.info("Eğer 'Birim Maliyet (Ham)' beklediğinizden yüksekse, Sentos'taki alış fiyatını kontrol edin.")
+                        st.info("Eğer 'Birim Maliyet (Ham)' 0.00 ₺ ise, ürün Sentos'ta bulunamamış veya maliyeti girilmemiştir.")
             
     except Exception as e:
         st.error(f"Analiz sırasında hata: {e}")
         status_text.text("❌ Hata oluştu.")
+        import traceback
+        st.code(traceback.format_exc())
 
 # 3. Sonuçlar ve Görselleştirme
 if st.session_state.profit_df is not None and not st.session_state.profit_df.empty:

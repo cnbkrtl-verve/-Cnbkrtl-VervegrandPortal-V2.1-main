@@ -147,11 +147,17 @@ class SentosAPI:
                 logging.warning(f"Sentos API'de '{sku}' SKU'su ile ürün bulunamadı.")
                 return None
             
-            product = products[0]
-            # Debug: Fiyat alanlarını kontrol et
-            # logging.info(f"SKU {sku} için bulunan ürün fiyatları: purchase_price={product.get('purchase_price')}, AlisFiyati={product.get('AlisFiyati')}")
+            # Tam eşleşme kontrolü (Case insensitive)
+            target_sku = sku.strip().lower()
+            for product in products:
+                p_sku = str(product.get('sku', '')).strip().lower()
+                if p_sku == target_sku:
+                    return product
             
-            return product
+            # Eğer tam eşleşme yoksa, ilk ürünü döndür ama logla
+            logging.warning(f"SKU '{sku}' için tam eşleşme bulunamadı, ilk sonuç kullanılıyor: {products[0].get('sku')}")
+            return products[0]
+            
         except Exception as e:
             logging.error(f"Sentos'ta SKU '{sku}' aranırken hata: {e}")
             raise
@@ -169,7 +175,25 @@ class SentosAPI:
                 logging.warning(f"Sentos API'de '{barcode}' barkodu ile ürün bulunamadı.")
                 return None
             
+            # Tam eşleşme kontrolü
+            target_barcode = barcode.strip().lower()
+            for product in products:
+                p_barcode = str(product.get('barcode', '')).strip().lower()
+                if p_barcode == target_barcode:
+                    return product
+            
+            # Varyantlarda barkod ara
+            for product in products:
+                for variant in product.get('variants', []):
+                    v_barcode = str(variant.get('barcode', '')).strip().lower()
+                    if v_barcode == target_barcode:
+                        # Varyantı değil ana ürünü döndürüyoruz, çünkü fiyat bilgisini oradan alacağız
+                        # (veya varyant fiyatını sales_analytics içinde alacağız)
+                        return product
+
+            logging.warning(f"Barkod '{barcode}' için tam eşleşme bulunamadı, ilk sonuç kullanılıyor: {products[0].get('barcode')}")
             return products[0]
+            
         except Exception as e:
             logging.error(f"Sentos'ta Barkod '{barcode}' aranırken hata: {e}")
             return None
