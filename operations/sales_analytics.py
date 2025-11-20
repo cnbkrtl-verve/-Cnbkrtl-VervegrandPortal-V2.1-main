@@ -52,30 +52,46 @@ class SalesAnalytics:
                 
                 product = self.sentos_api.get_product_by_sku(sku)
                 if not product:
+                    logging.warning(f"SKU {sku} için ürün bulunamadı.")
                     return
+                
+                # Debug: Ürün verisini logla
+                # logging.info(f"SKU {sku} Raw Data: {product}")
                 
                 # Ana ürün maliyeti
                 main_sku = str(product.get('sku', '')).strip()
-                try:
-                    price = float(str(product.get('purchase_price') or product.get('AlisFiyati') or '0').replace(',', '.'))
-                except:
-                    price = 0.0
+                
+                # Fiyat Parse Etme Fonksiyonu
+                def parse_price(val):
+                    if val is None: return 0.0
+                    try:
+                        # String ise temizle
+                        if isinstance(val, str):
+                            val = val.replace(',', '.')
+                            # Birden fazla nokta varsa (örn: 1.234.56) sonuncusu hariç hepsini kaldır
+                            if val.count('.') > 1:
+                                parts = val.split('.')
+                                val = "".join(parts[:-1]) + "." + parts[-1]
+                        return float(val)
+                    except:
+                        return 0.0
+
+                price = parse_price(product.get('purchase_price') or product.get('AlisFiyati'))
                 
                 if main_sku:
                     cost_map[main_sku] = price
+                    logging.info(f"SKU {main_sku} Maliyet: {price}")
                 
                 # Varyantların maliyetleri (Bir SKU sorgusu tüm varyantları getirebilir)
                 for v in product.get('variants', []):
                     v_sku = str(v.get('sku', '')).strip()
-                    try:
-                        v_price = float(str(v.get('purchase_price') or v.get('AlisFiyati') or '0').replace(',', '.'))
-                    except:
-                        v_price = 0.0
+                    v_price = parse_price(v.get('purchase_price') or v.get('AlisFiyati'))
                     
                     # Varyant fiyatı 0 ise ana ürün fiyatını kullan
                     final_price = v_price if v_price > 0 else price
                     if v_sku:
                         cost_map[v_sku] = final_price
+                        # logging.info(f"Varyant SKU {v_sku} Maliyet: {final_price}")
                         
             except Exception as e:
                 logging.warning(f"SKU {sku} maliyeti çekilirken hata: {e}")

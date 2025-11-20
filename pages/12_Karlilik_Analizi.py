@@ -174,6 +174,23 @@ if st.button("🚀 Analizi Başlat", type="primary", use_container_width=True):
             status_text.text("✅ Analiz tamamlandı!")
             st.success(f"✅ {len(orders)} sipariş başarıyla analiz edildi.")
             
+            # DEBUG: Maliyet Kontrolü
+            with st.expander("🛠️ Geliştirici Detayları (Maliyet Kontrolü)"):
+                st.write(f"Toplam {len(unique_skus)} adet benzersiz SKU tarandı.")
+                st.write(f"Bulunan Maliyet Sayısı: {len(cost_map)}")
+                
+                # Maliyeti 0 olanları ve olmayanları ayır
+                found_costs = {k: v for k, v in cost_map.items() if v > 0}
+                missing_costs = [sku for sku in unique_skus if sku not in cost_map or cost_map[sku] == 0]
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write("✅ Maliyeti Bulunanlar (Örnek 20):")
+                    st.json(dict(list(found_costs.items())[:20]))
+                with c2:
+                    st.write("⚠️ Maliyeti Bulunamayanlar/Sıfır Olanlar (Örnek 20):")
+                    st.write(missing_costs[:20])
+            
     except Exception as e:
         st.error(f"Analiz sırasında hata: {e}")
         status_text.text("❌ Hata oluştu.")

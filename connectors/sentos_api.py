@@ -145,9 +145,12 @@ class SentosAPI:
             if not products:
                 logging.warning(f"Sentos API'de '{sku}' SKU'su ile ürün bulunamadı.")
                 return None
-            logging.info(f"Sentos API'de '{sku}' SKU'su ile ürün bulundu.")
-            # API liste döndürdüğü için ilk elemanı alıyoruz.
-            return products[0]
+            
+            product = products[0]
+            # Debug: Fiyat alanlarını kontrol et
+            # logging.info(f"SKU {sku} için bulunan ürün fiyatları: purchase_price={product.get('purchase_price')}, AlisFiyati={product.get('AlisFiyati')}")
+            
+            return product
         except Exception as e:
             logging.error(f"Sentos'ta SKU '{sku}' aranırken hata: {e}")
             raise
