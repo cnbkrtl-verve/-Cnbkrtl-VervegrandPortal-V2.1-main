@@ -17,7 +17,7 @@ from connectors.shopify_api import ShopifyAPI
 from connectors.sentos_api import SentosAPI
 from operations.sales_analytics import SalesAnalytics
 from config_manager import load_all_user_keys
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Kârlılık Analizi", page_icon="💰", layout="wide")
@@ -225,7 +225,7 @@ if st.session_state.profit_df is not None and not st.session_state.profit_df.emp
     gb.configure_column("Kâr Marjı (%)", type=["numericColumn", "numberColumnFilter"], precision=2)
     
     # Koşullu Biçimlendirme (Negatif kâr kırmızı)
-    js_code = """
+    js_code = JsCode("""
     function(params) {
         if (params.value < 0) {
             return {'color': 'red', 'fontWeight': 'bold'};
@@ -233,7 +233,7 @@ if st.session_state.profit_df is not None and not st.session_state.profit_df.emp
             return {'color': 'green', 'fontWeight': 'bold'};
         }
     }
-    """
+    """)
     gb.configure_column("Net Kâr", cellStyle=js_code)
     
     gridOptions = gb.build()
