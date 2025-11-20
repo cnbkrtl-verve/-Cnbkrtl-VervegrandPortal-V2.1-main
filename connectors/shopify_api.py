@@ -2155,3 +2155,97 @@ class ShopifyAPI:
         except Exception as e:
             logging.error(f"❌ Metafield definitions oluşturma hatası: {e}")
             return {'success': False, 'created': 0, 'errors': [str(e)]}
+    
+    def update_product_details(self, product_id, tags=None, vendor=None, product_type=None):
+        """
+        Ürünün etiketlerini, markasını veya tipini günceller.
+        
+        Args:
+            product_id: Ürün GID (gid://shopify/Product/123456)
+            tags: Etiket listesi (list of strings) veya virgülle ayrılmış string
+            vendor: Marka (Vendor)
+            product_type: Ürün Tipi (Product Type)
+            
+        Returns:
+            dict: {'success': bool, 'message': str}
+        """
+        try:
+            input_data = {"id": product_id}
+            
+            if tags is not None:
+                if isinstance(tags, str):
+                    # Virgülle ayrılmış string ise listeye çevir
+                    tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+                    input_data["tags"] = tag_list
+                elif isinstance(tags, list):
+                    input_data["tags"] = tags
+            
+            if vendor is not None:
+                input_data["vendor"] = vendor
+                
+            if product_type is not None:
+                input_data["productType"] = product_type
+            
+            if len(input_data) <= 1:
+                return {'success': False, 'message': 'Güncellenecek veri yok'}
+
+            mutation = """
+            mutation productUpdate($input: ProductInput!) {
+              productUpdate(input: $input) {
+                product {
+                  id
+                  tags
+                  vendor
+                  productType
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """
+            
+            result = self.execute_graphql(mutation, {"input": input_data})
+            
+            errors = result.get('productUpdate', {}).get('userErrors', [])
+            if errors:
+                error_msg = f"Güncelleme hatası: {errors}"
+                logging.error(error_msg)
+                return {'success': False, 'message': error_msg}
+            
+            return {'success': True, 'message': 'Ürün başarıyla güncellendi'}
+            
+        except Exception as e:
+            logging.error(f"Ürün güncelleme hatası: {e}")
+            return {'success': False, 'message': str(e)}
+
+    def search_products(self, query_str, limit=50):
+        """
+        Ürünleri arar (title, tag, vendor vb.)
+        """
+        query = """
+        query searchProducts($query: String!, $first: Int!) {
+          products(first: $first, query: $query) {
+            edges {
+              node {
+                id
+                title
+                handle
+                vendor
+                productType
+                tags
+                featuredImage { url }
+              }
+            }
+          }
+        }
+        """
+        variables = {"query": query_str, "first": limit}
+        try:
+            result = self.execute_graphql(query, variables)
+            edges = result.get('products', {}).get('edges', [])
+            return [edge['node'] for edge in edges]
+        except Exception as e:
+            logging.error(f"Ürün arama hatası: {e}")
+            return []
