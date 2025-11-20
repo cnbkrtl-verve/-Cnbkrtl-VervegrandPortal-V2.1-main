@@ -824,21 +824,46 @@ if st.session_state.calculated_df is not None:
                     if st.button("✅ Evet, Onaylıyorum", type="primary", key="btn_confirm_update"):
                         st.session_state.confirm_collection_update = False # Reset
                         st.session_state.update_in_progress = True
+                        # Queue'yu oluştur ve değişkene ata
                         st.session_state.sync_progress_queue = queue.Queue()
+                        progress_queue = st.session_state.sync_progress_queue
                         
-                        def run_collection_update():
-                            from operations.price_sync import update_collection_custom
-                            shopify_api = ShopifyAPI(st.session_state.shopify_store, st.session_state.shopify_token)
-                            result = update_collection_custom(
-                                shopify_api, 
-                                selected_collection_id, 
-                                rule_type[1], 
-                                rule_value, 
-                                progress_queue=st.session_state.sync_progress_queue
-                            )
-                            st.session_state.sync_progress_queue.put({"status": "done", "results": result})
+                        # Thread için gerekli verileri al
+                        store_url = st.session_state.shopify_store
+                        store_token = st.session_state.shopify_token
+                        
+                        def run_collection_update(q, store, token, col_id, r_type, r_val):
+                            try:
+                                q.put({'progress': 1, 'message': 'İşlem başlatılıyor...'})
+                                
+                                # Importları thread içinde yap
+                                from operations.price_sync import update_collection_custom
+                                from connectors.shopify_api import ShopifyAPI
+                                
+                                q.put({'progress': 2, 'message': 'Shopify bağlantısı kuruluyor...'})
+                                shopify_api = ShopifyAPI(store, token)
+                                
+                                q.put({'progress': 5, 'message': 'Koleksiyon verileri çekiliyor...'})
+                                result = update_collection_custom(
+                                    shopify_api, 
+                                    col_id, 
+                                    r_type, 
+                                    r_val, 
+                                    progress_queue=q
+                                )
+                                q.put({"status": "done", "results": result})
+                                
+                            except Exception as e:
+                                logging.error(f"Collection update thread error: {e}")
+                                q.put({"status": "error", "message": f"İşlem hatası: {str(e)}"})
 
-                        threading.Thread(target=run_collection_update, daemon=True).start()
+                        # Thread'i başlat
+                        threading.Thread(
+                            target=run_collection_update, 
+                            args=(progress_queue, store_url, store_token, selected_collection_id, rule_type[1], rule_value),
+                            daemon=True
+                        ).start()
+                        
                         st.rerun()
                 
                 with col_conf2:
