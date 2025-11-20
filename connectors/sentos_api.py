@@ -138,9 +138,10 @@ class SentosAPI:
         """Verilen SKU'ya göre Sentos'tan tek bir ürün çeker."""
         if not sku:
             raise ValueError("Aranacak SKU boş olamaz.")
-        endpoint = f"/products?sku={sku.strip()}"
+        endpoint = "/products"
+        params = {'sku': sku.strip()}
         try:
-            response = self._make_request("GET", endpoint).json()
+            response = self._make_request("GET", endpoint, params=params).json()
             products = response.get('data', [])
             if not products:
                 logging.warning(f"Sentos API'de '{sku}' SKU'su ile ürün bulunamadı.")
@@ -159,9 +160,10 @@ class SentosAPI:
         """Verilen Barkoda göre Sentos'tan tek bir ürün çeker."""
         if not barcode:
             return None
-        endpoint = f"/products?barcode={barcode.strip()}"
+        endpoint = "/products"
+        params = {'barcode': barcode.strip()}
         try:
-            response = self._make_request("GET", endpoint).json()
+            response = self._make_request("GET", endpoint, params=params).json()
             products = response.get('data', [])
             if not products:
                 logging.warning(f"Sentos API'de '{barcode}' barkodu ile ürün bulunamadı.")

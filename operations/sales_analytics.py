@@ -84,6 +84,9 @@ class SalesAnalytics:
 
                 price = parse_price(product.get('purchase_price') or product.get('AlisFiyati'))
                 
+                # Aranan SKU'yu da kesinlikle map'e ekle (Eşleşme garantisi için)
+                cost_map[sku] = price
+                
                 if main_sku:
                     cost_map[main_sku] = price
                     logging.info(f"SKU {main_sku} Maliyet: {price}")

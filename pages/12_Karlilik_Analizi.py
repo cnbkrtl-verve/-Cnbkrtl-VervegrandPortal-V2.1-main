@@ -213,6 +213,14 @@ if st.session_state.profit_df is not None and not st.session_state.profit_df.emp
     m3.metric("Toplam Kargo", f"{total_shipping:,.2f} ₺", delta_color="inverse")
     m4.metric("Toplam Net Kâr", f"{total_net_profit:,.2f} ₺", f"%{avg_margin:.1f}", delta_color="normal")
     
+    if total_cost == 0 and total_revenue > 0:
+        st.warning("⚠️ Toplam maliyet 0.00 ₺ görünüyor. Bu durum şunlardan kaynaklanabilir:")
+        st.markdown("""
+        - Ürünlerin Sentos'ta **alış fiyatı** girilmemiş olabilir.
+        - Shopify'daki **SKU**'lar ile Sentos'taki **SKU** veya **Barkod**'lar eşleşmiyor olabilir.
+        - "Geliştirici Detayları" kısmından hangi ürünlerin maliyetinin bulunamadığını kontrol edebilirsiniz.
+        """)
+    
     # Grafikler
     c_chart1, c_chart2 = st.columns(2)
     
