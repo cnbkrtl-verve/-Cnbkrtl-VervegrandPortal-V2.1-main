@@ -229,7 +229,6 @@ class CategoryMetafieldManager:
         return CategoryMetafieldManager.get_category_metafields().get(category, {})
     
     @staticmethod
-    @staticmethod
     def prepare_metafields_for_shopify(
         category: str, 
         product_title: str,
