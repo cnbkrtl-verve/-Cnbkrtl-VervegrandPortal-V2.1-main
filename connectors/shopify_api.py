@@ -1664,186 +1664,116 @@ class ShopifyAPI:
                 'title': ''
             }
     
-    def update_product_category_and_metafields(self, product_gid: str, category: str, metafields: list, use_shopify_suggestions: bool = True) -> dict:
+    def update_product_category_and_metafields(self, product_gid: str, category: str, metafields: list, use_shopify_suggestions: bool = True, taxonomy_id: str = None) -> dict:
         """
         Ürünün kategorisini ve meta alanlarını günceller.
-        Shopify'ın önerdiği kategori ve önerilen attribute'leri kullanır.
+        Tek bir mutation ile hem kategori hem de meta alanları günceller.
         
         Args:
             product_gid: Ürün GID (gid://shopify/Product/123456)
-            category: Kategori adı - yedek olarak kullanılır
-            metafields: Bizim meta alan listemiz
-            use_shopify_suggestions: Shopify önerilerini kullan (varsayılan: True)
+            category: Kategori adı (Loglama için)
+            metafields: Meta alan listesi [{namespace, key, value, type}]
+            use_shopify_suggestions: (Artık kullanılmıyor, geriye dönük uyumluluk için)
+            taxonomy_id: Kategori Taxonomy ID (gid://shopify/TaxonomyCategory/aa-1-4)
             
         Returns:
-            dict: {'success': bool, 'message': str, 'updated_category': str, 'updated_metafields': int}
+            dict: {'success': bool, 'message': str}
         """
         try:
-            updated_count = 0
-            applied_category = None
-            
-            # 1. Shopify'ın Önerilerini Al
-            if use_shopify_suggestions:
-                recommendations = self.get_product_recommendations(product_gid)
-                suggested_category = recommendations.get('suggested_category')
-                recommended_attrs = recommendations.get('recommended_attributes', [])
-                
-                logging.info(f"📊 Shopify Önerileri:")
-                if suggested_category:
-                    logging.info(f"   Kategori: {suggested_category.get('fullName', 'N/A')}")
-                if recommended_attrs:
-                    logging.info(f"   Önerilen Attribute'ler: {', '.join(recommended_attrs)}")
-                
-                # Shopify'ın önerdiği kategoriyi set et
-                if suggested_category and suggested_category.get('id'):
-                    category_mutation = """
-                    mutation updateProductCategory($input: ProductInput!) {
-                        productUpdate(input: $input) {
-                            product {
-                                id
-                                category {
-                                    id
-                                    fullName
+            logging.info(f"🔄 Ürün güncelleniyor: {product_gid}")
+            logging.info(f"   Kategori: {category} (ID: {taxonomy_id})")
+            logging.info(f"   Meta Alanlar: {len(metafields)} adet")
+
+            # Input objesini hazırla
+            product_input = {
+                "id": product_gid
+            }
+
+            # 1. Kategori ID ekle (varsa)
+            if taxonomy_id:
+                # Eğer tam GID değilse, formatla
+                if not taxonomy_id.startswith('gid://'):
+                    taxonomy_id = f"gid://shopify/TaxonomyCategory/{taxonomy_id}"
+                product_input["category"] = taxonomy_id
+
+            # 2. Metafield'ları ekle
+            if metafields:
+                metafields_input = []
+                for mf in metafields:
+                    metafields_input.append({
+                        "namespace": mf['namespace'],
+                        "key": mf['key'],
+                        "value": str(mf['value']), # Değeri string'e çevir
+                        "type": mf['type']
+                    })
+                product_input["metafields"] = metafields_input
+
+            # 3. Tek Mutation ile Gönder
+            mutation = """
+            mutation updateProduct($input: ProductInput!) {
+                productUpdate(input: $input) {
+                    product {
+                        id
+                        category {
+                            id
+                            fullName
+                        }
+                        metafields(first: 10) {
+                            edges {
+                                node {
+                                    namespace
+                                    key
+                                    value
                                 }
-                            }
-                            userErrors {
-                                field
-                                message
                             }
                         }
                     }
-                    """
-                    
-                    # ÖNEMLI: GID formatında gönder!
-                    result = self.execute_graphql(
-                        category_mutation,
-                        {
-                            "input": {
-                                "id": product_gid,
-                                "category": suggested_category['id']  # ← GID formatında: gid://shopify/TaxonomyCategory/aa-2-6-14
-                            }
-                        }
-                    )
-                    
-                    errors = result.get('productUpdate', {}).get('userErrors', [])
-                    if errors:
-                        logging.error(f"❌ Kategori set hatası: {errors}")
-                    else:
-                        updated_cat = result.get('productUpdate', {}).get('product', {}).get('category', {})
-                        applied_category = updated_cat.get('fullName', suggested_category.get('fullName'))
-                        logging.info(f"✅ Shopify önerisi kategori set edildi: {applied_category}")
-                        updated_count += 1
-            
-            # 2. Metafields güncelle (bizim metafield'larımız + Shopify önerileri)
-            if metafields:
-                # NOT: Shopify önerileri zaten metafields içinde var!
-                # CategoryMetafieldManager.prepare_metafields_for_shopify() 
-                # fonksiyonu başlık ve varyantlardan zaten çıkarıyor.
-                # Burada sadece ek boş alanlar eklemeyelim!
-                
-                # Tüm metafield'ları tek bir mutation ile güncelle
-                metafield_mutation = """
-                mutation updateProductMetafields($input: ProductInput!) {
-                    productUpdate(input: $input) {
-                        product {
-                            id
-                            metafields(first: 100) {
-                                edges {
-                                    node {
-                                        namespace
-                                        key
-                                        value
-                                    }
-                                }
-                            }
-                        }
-                        userErrors {
-                            field
-                            message
-                        }
+                    userErrors {
+                        field
+                        message
                     }
                 }
-                """
-                
-                # Metafield'ları hazırla
-                metafields_input = []
-                for metafield in metafields:
-                    metafields_input.append({
-                        "namespace": metafield['namespace'],
-                        "key": metafield['key'],
-                        "value": metafield['value'],
-                        "type": metafield['type']
-                    })
-                
-                result = self.execute_graphql(
-                    metafield_mutation, 
-                    {
-                        "input": {
-                            "id": product_gid,
-                            "metafields": metafields_input
-                        }
-                    }
-                )
-                
-                errors = result.get('productUpdate', {}).get('userErrors', [])
-                if errors:
-                    logging.error(f"❌ Metafield güncelleme hatası: {errors}")
-                else:
-                    updated_metafields = result.get('productUpdate', {}).get('product', {}).get('metafields', {}).get('edges', [])
-                    logging.info(f"✅ {len(metafields)} meta alan güncellendi")
-                    for mf in metafields[:3]:  # İlk 3 metafield'ı logla
-                        logging.info(f"   → {mf['namespace']}.{mf['key']} = '{mf['value']}'")
-                    if len(metafields) > 3:
-                        logging.info(f"   → ... ve {len(metafields) - 3} tane daha")
-                    updated_count += len(metafields)
+            }
+            """
+
+            result = self.execute_graphql(mutation, {"input": product_input})
             
-            # 3. 🌟 YENİ: Taxonomy Attribute'lerine de yaz!
-            # Kategori set edildikten sonra, o kategorinin standart attribute'lerine değer yaz
-            if metafields and applied_category:
-                try:
-                    # Metafield'lardan taxonomy attribute mapping yap
-                    taxonomy_attrs = self._map_metafields_to_taxonomy_attributes(metafields)
-                    
-                    if taxonomy_attrs:
-                        logging.info(f"📝 {len(taxonomy_attrs)} taxonomy attribute set ediliyor...")
-                        attr_result = self.update_product_taxonomy_attributes(
-                            product_gid=product_gid,
-                            attributes=taxonomy_attrs
-                        )
-                        
-                        if attr_result.get('success'):
-                            logging.info(f"✅ Taxonomy attribute'ler güncellendi")
-                        else:
-                            logging.warning(f"⚠️ Taxonomy attribute güncelleme kısmen başarısız")
-                except Exception as e:
-                    logging.warning(f"⚠️ Taxonomy attribute güncelleme hatası (devam ediliyor): {e}")
-                    for mf in metafields[:3]:  # İlk 3 metafield'ı logla
-                        logging.info(f"   → {mf['namespace']}.{mf['key']} = '{mf['value']}'")
-                    if len(metafields) > 3:
-                        logging.info(f"   → ... ve {len(metafields) - 3} tane daha")
-                    updated_count += len(metafields)
+            # Hata kontrolü
+            user_errors = result.get('productUpdate', {}).get('userErrors', [])
+            if user_errors:
+                error_msgs = [f"{err['field']}: {err['message']}" for err in user_errors]
+                error_str = ", ".join(error_msgs)
+                logging.error(f"❌ Güncelleme hatası: {error_str}")
+                return {
+                    'success': False,
+                    'message': f"Hata: {error_str}",
+                    'updated_category': None,
+                    'updated_metafields': 0
+                }
+
+            # Başarılı sonuç
+            product_data = result.get('productUpdate', {}).get('product', {})
+            updated_cat = product_data.get('category', {})
+            cat_name = updated_cat.get('fullName') if updated_cat else category
             
-            # Başarı mesajını hazırla
-            message_parts = []
-            if applied_category:
-                message_parts.append(f"Kategori: {applied_category}")
-            if metafields:
-                message_parts.append(f"{len(metafields)} meta alan")
-            
-            success_message = "✅ " + " ve ".join(message_parts) + " güncellendi"
+            logging.info(f"✅ Güncelleme başarılı!")
+            if cat_name:
+                logging.info(f"   Yeni Kategori: {cat_name}")
             
             return {
                 'success': True,
-                'message': success_message,
-                'updated_category': applied_category or category,
+                'message': f"Kategori ({cat_name}) ve {len(metafields)} meta alan güncellendi.",
+                'updated_category': cat_name,
                 'updated_metafields': len(metafields)
             }
             
         except Exception as e:
-            logging.error(f"❌ Kategori/metafield güncelleme hatası: {e}")
+            logging.error(f"❌ Beklenmeyen hata: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
-                'message': f'Hata: {str(e)}',
+                'message': f'Sistem Hatası: {str(e)}',
                 'updated_category': None,
                 'updated_metafields': 0
             }
