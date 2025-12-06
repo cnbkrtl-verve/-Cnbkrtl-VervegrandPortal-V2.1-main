@@ -54,8 +54,12 @@ shopify = ShopifyAPI(keys["shopify_store"], keys["shopify_token"])
 # Session State Başlatma
 if 'all_products' not in st.session_state:
     st.session_state.all_products = [] # Tüm çekilen ürünler
-if 'workspace_products' not in st.session_state:
-    st.session_state.workspace_products = [] # İşlem yapılacak seçili ürünler
+if 'workspace_url' not in st.session_state:
+    st.session_state.workspace_url = [] 
+if 'workspace_content' not in st.session_state:
+    st.session_state.workspace_content = []
+if 'workspace_image' not in st.session_state:
+    st.session_state.workspace_image = []
 if 'ai_results' not in st.session_state:
     st.session_state.ai_results = []
 
@@ -92,9 +96,10 @@ def fetch_products_recursive(limit=None):
     while has_next:
         status_text.text(f"Ürünler çekiliyor... Toplam: {len(products)}")
         
+        # Query complexity düşürüldü (250 -> 50) ve hata yönetimi eklendi
         query = """
         query ($cursor: String) {
-            products(first: 250, after: $cursor) {
+            products(first: 50, after: $cursor) {
                 pageInfo {
                     hasNextPage
                     endCursor
@@ -105,6 +110,15 @@ def fetch_products_recursive(limit=None):
                         title
                         handle
                         description
+                        tags
+                        seo {
+                            title
+                            description
+                        }
+                        options {
+                            name
+                            values
+                        }
                         featuredImage {
                             id
                             altText
@@ -124,23 +138,30 @@ def fetch_products_recursive(limit=None):
         }
         """
         variables = {"cursor": cursor}
-        result = shopify.execute_graphql(query, variables)
-        
-        if result and 'data' in result:
-            data = result['data']['products']
-            new_products = [edge['node'] for edge in data['edges']]
-            products.extend(new_products)
+        try:
+            # execute_graphql zaten 'data' kısmını döndürüyor
+            result = shopify.execute_graphql(query, variables)
             
-            has_next = data['pageInfo']['hasNextPage']
-            cursor = data['pageInfo']['endCursor']
-            
-            if limit and len(products) >= limit:
-                products = products[:limit]
+            if result and 'products' in result:
+                data = result['products']
+                new_products = [edge['node'] for edge in data['edges']]
+                products.extend(new_products)
+                
+                has_next = data['pageInfo']['hasNextPage']
+                cursor = data['pageInfo']['endCursor']
+                
+                if limit and len(products) >= limit:
+                    products = products[:limit]
+                    break
+            else:
+                # Eğer result boşsa veya products yoksa
+                st.error(f"API Yanıtı Beklenmedik Format: {result}")
                 break
-        else:
+        except Exception as e:
+            st.error(f"Bağlantı Hatası: {str(e)}")
             break
             
-        # İlerleme çubuğu simülasyonu (tam sayı bilinmediği için döngüsel)
+        # İlerleme çubuğu simülasyonu
         progress_bar.progress((len(products) % 100) / 100)
         
     progress_bar.empty()
@@ -218,15 +239,24 @@ with tab_cockpit:
         # DataFrame Hazırlığı
         df_data = []
         for p in st.session_state.all_products:
+            img_url = p['featuredImage']['url'] if p.get('featuredImage') else ""
             img_alt = p['featuredImage']['altText'] if p.get('featuredImage') else ""
             sku = p['variants']['edges'][0]['node']['sku'] if p['variants']['edges'] else ""
+            seo_title = p.get('seo', {}).get('title', '') if p.get('seo') else ""
+            seo_desc = p.get('seo', {}).get('description', '') if p.get('seo') else ""
+            tags = ", ".join(p.get('tags', []))
+            
             df_data.append({
-                "ID": p['id'],
+                "Seç": False,
+                "Görsel": img_url,
                 "Ürün Adı": p['title'],
                 "SKU": sku,
                 "Handle": p['handle'],
-                "Mevcut Alt Text": img_alt,
-                "Seç": False
+                "Alt Text": img_alt,
+                "SEO Başlık": seo_title,
+                "SEO Açıklama": seo_desc,
+                "Etiketler": tags,
+                "ID": p['id']
             })
         
         df = pd.DataFrame(df_data)
@@ -236,42 +266,82 @@ with tab_cockpit:
         with col_search:
             search_term = st.text_input("Ara (Ürün Adı, SKU veya Handle)", placeholder="Örn: elbise")
         
+        with col_filter:
+            st.write("") # Hizalama için boşluk
+            st.write("")
+            select_all = st.checkbox("Listelenen Tümünü Seç", value=False, help="Aşağıdaki listede görünen tüm ürünleri seçili hale getirir.")
+        
         if search_term:
             df = df[df['Ürün Adı'].str.contains(search_term, case=False) | 
                    df['SKU'].str.contains(search_term, case=False) |
                    df['Handle'].str.contains(search_term, case=False)]
+        
+        if select_all:
+            df["Seç"] = True
 
         # Data Editor ile Seçim
+        # Key'i dinamik yaparak select_all değiştiğinde resetlenmesini sağlıyoruz
+        editor_key = f"editor_{select_all}_{len(df)}_{search_term}"
+        
         edited_df = st.data_editor(
             df,
             column_config={
                 "Seç": st.column_config.CheckboxColumn(
-                    "İşlem İçin Seç",
-                    help="Bu ürünleri diğer sekmelerde düzenlemek için seçin.",
+                    "Seç",
+                    help="İşlem yapılacak ürünleri seçin",
                     default=False,
+                    width="small"
                 ),
+                "Görsel": st.column_config.ImageColumn(
+                    "Görsel",
+                    help="Ürün ana görseli",
+                    width="small"
+                ),
+                "Ürün Adı": st.column_config.TextColumn("Ürün Adı", width="medium"),
+                "SKU": st.column_config.TextColumn("SKU", width="small"),
+                "Handle": st.column_config.TextColumn("Handle", width="medium"),
+                "Alt Text": st.column_config.TextColumn("Alt Text", width="medium"),
+                "SEO Başlık": st.column_config.TextColumn("SEO Başlık", width="medium"),
+                "SEO Açıklama": st.column_config.TextColumn("SEO Açıklama", width="large"),
+                "Etiketler": st.column_config.TextColumn("Etiketler", width="medium"),
                 "ID": None # ID'yi gizle
             },
             hide_index=True,
             use_container_width=True,
-            height=400
+            height=600,
+            key=editor_key
         )
         
         # Seçilenleri Çalışma Masasına Aktar
         selected_rows = edited_df[edited_df["Seç"] == True]
+        st.info(f"{len(selected_rows)} ürün seçildi.")
         
-        col_action_1, col_action_2 = st.columns([1, 4])
-        with col_action_1:
-            if st.button("Seçilenleri Çalışma Masasına Ekle ➡️"):
-                selected_ids = selected_rows["ID"].tolist()
-                # ID'ye göre orijinal objeleri bul
-                selected_objs = [p for p in st.session_state.all_products if p['id'] in selected_ids]
-                st.session_state.workspace_products = selected_objs
-                st.success(f"{len(selected_objs)} ürün çalışma masasına eklendi!")
+        st.markdown("### 📤 İşlem Seçimi")
+        col_btn1, col_btn2, col_btn3 = st.columns(3)
         
-        with col_action_2:
-            if st.session_state.workspace_products:
-                st.info(f"📂 Çalışma Masasında **{len(st.session_state.workspace_products)}** ürün bekliyor.")
+        selected_ids = selected_rows["ID"].tolist()
+        selected_objs = [p for p in st.session_state.all_products if p['id'] in selected_ids]
+        
+        with col_btn1:
+            if st.button("🔗 URL Yönetimine Gönder", use_container_width=True):
+                st.session_state.workspace_url = selected_objs
+                st.success(f"{len(selected_objs)} ürün URL modülüne aktarıldı!")
+            if st.session_state.workspace_url:
+                st.caption(f"Bekleyen: {len(st.session_state.workspace_url)} ürün")
+
+        with col_btn2:
+            if st.button("📝 İçerik Stüdyosuna Gönder", use_container_width=True):
+                st.session_state.workspace_content = selected_objs
+                st.success(f"{len(selected_objs)} ürün İçerik modülüne aktarıldı!")
+            if st.session_state.workspace_content:
+                st.caption(f"Bekleyen: {len(st.session_state.workspace_content)} ürün")
+
+        with col_btn3:
+            if st.button("🖼️ Görsel SEO'ya Gönder", use_container_width=True):
+                st.session_state.workspace_image = selected_objs
+                st.success(f"{len(selected_objs)} ürün Görsel modülüne aktarıldı!")
+            if st.session_state.workspace_image:
+                st.caption(f"Bekleyen: {len(st.session_state.workspace_image)} ürün")
 
 # ==========================================
 # 2. TAB: URL & YÖNLENDİRME (Smart Redirects)
@@ -279,8 +349,8 @@ with tab_cockpit:
 with tab_url:
     st.header("🔗 Akıllı URL Yönetimi")
     
-    if not st.session_state.workspace_products:
-        st.warning("Lütfen önce 'Ürün Kokpiti' sekmesinden ürün seçin.")
+    if not st.session_state.workspace_url:
+        st.warning("Lütfen önce 'Ürün Kokpiti' sekmesinden ürün seçip 'URL Yönetimine Gönder' butonuna basın.")
     else:
         col_url_settings, col_url_preview = st.columns([1, 2])
         
@@ -305,7 +375,7 @@ with tab_url:
             st.subheader("Önizleme")
             
             preview_data = []
-            for p in st.session_state.workspace_products:
+            for p in st.session_state.workspace_url:
                 old_h = p['handle']
                 mode_key = "clean_only"
                 if handle_mode == "Sayıları Kaldır": mode_key = "remove_numbers"
@@ -337,7 +407,7 @@ with tab_url:
                 for i, row in enumerate(preview_data):
                     if row["Eski URL"] != row["Yeni URL"]:
                         # 1. Ürün Handle Güncelle
-                        p_id = next(p['id'] for p in st.session_state.workspace_products if p['title'] == row["Ürün"])
+                        p_id = next(p['id'] for p in st.session_state.workspace_url if p['title'] == row["Ürün"])
                         
                         mutation = """
                         mutation productUpdate($input: ProductInput!) {
@@ -367,7 +437,7 @@ with tab_url:
                     progress_bar.progress((i + 1) / len(preview_data))
                 
                 st.success(f"İşlem Tamamlandı! {success_count} ürün güncellendi, {redirect_count} yönlendirme oluşturuldu.")
-                st.session_state.workspace_products = [] # Temizle
+                st.session_state.workspace_url = [] # Temizle
 
 # ==========================================
 # 3. TAB: AI İÇERİK STÜDYOSU
@@ -375,10 +445,10 @@ with tab_url:
 with tab_content:
     st.header("📝 AI İçerik Stüdyosu")
     
-    if not st.session_state.workspace_products:
-        st.warning("Lütfen önce 'Ürün Kokpiti' sekmesinden ürün seçin.")
+    if not st.session_state.workspace_content:
+        st.warning("Lütfen önce 'Ürün Kokpiti' sekmesinden ürün seçip 'İçerik Stüdyosuna Gönder' butonuna basın.")
     else:
-        col_ai_opts, col_ai_res = st.columns([1, 2])
+        col_ai_opts, col_ai_res = st.columns([1, 3])
         
         with col_ai_opts:
             st.subheader("İçerik Ayarları")
@@ -387,47 +457,172 @@ with tab_content:
             tone = st.selectbox("İletişim Tonu", ["Satış Odaklı & İkna Edici", "Kurumsal & Profesyonel", "Samimi & Eğlenceli", "Lüks & Minimalist"])
             keywords = st.text_input("Hedef Anahtar Kelimeler", placeholder="yazlık elbise, pamuklu kumaş")
             
+            use_image_analysis = st.checkbox("📸 Görsel Analizi Kullan", value=True, help="Ürün görselini de AI'a göndererek daha detaylı içerik üretilmesini sağlar.")
             custom_prompt = st.text_area("Ek Talimatlar", "Özellikleri madde madde yaz, SEO uyumlu olsun.")
             
             if st.button("✨ İçerik Üret", type="primary"):
                 st.session_state.ai_results = []
                 prog = st.progress(0)
                 
-                for i, p in enumerate(st.session_state.workspace_products):
-                    res = {"id": p['id'], "title": p['title'], "original_desc": p.get('description', '')}
+                for i, p in enumerate(st.session_state.workspace_content):
+                    res = {
+                        "id": p['id'], 
+                        "title": p['title'], 
+                        "original_desc": p.get('description', ''),
+                        "original_meta_title": p.get('seo', {}).get('title', ''),
+                        "original_meta_desc": p.get('seo', {}).get('description', ''),
+                        "new_desc": p.get('description', ''),
+                        "new_meta_title": p.get('seo', {}).get('title', ''),
+                        "new_meta_desc": p.get('seo', {}).get('description', '')
+                    }
                     
                     full_prompt = f"Ton: {tone}. Anahtar Kelimeler: {keywords}. {custom_prompt}"
+                    img_url = p.get('featuredImage', {}).get('url') if use_image_analysis and p.get('featuredImage') else None
                     
                     if "Ürün Açıklaması" in target_type:
-                        res["new_desc"] = seo_manager.generate_product_description(p['title'], p.get('description', ''), "Detaylar...", full_prompt)
+                        res["new_desc"] = seo_manager.generate_product_description(
+                            p['title'], 
+                            p.get('description', ''), 
+                            "Detaylar...", 
+                            full_prompt,
+                            image_url=img_url
+                        )
                     
                     if "Meta Title & Description" in target_type:
-                        res["new_meta"] = seo_manager.generate_seo_meta(p['title'], p.get('description', ''), full_prompt)
+                        # Meta çıktısını parse etmemiz gerekebilir, şimdilik düz metin olarak alıyoruz
+                        meta_text = seo_manager.generate_seo_meta(
+                            p['title'], 
+                            p.get('description', ''), 
+                            full_prompt,
+                            image_url=img_url
+                        )
+                        # Basit parsing denemesi
+                        if "Title:" in meta_text and "Description:" in meta_text:
+                            try:
+                                parts = meta_text.split("Description:")
+                                res["new_meta_title"] = parts[0].replace("Title:", "").strip()
+                                res["new_meta_desc"] = parts[1].strip()
+                            except:
+                                res["new_meta_desc"] = meta_text
+                        else:
+                            res["new_meta_desc"] = meta_text
                         
                     st.session_state.ai_results.append(res)
-                    prog.progress((i + 1) / len(st.session_state.workspace_products))
+                    prog.progress((i + 1) / len(st.session_state.workspace_content))
                 st.success("Üretim Tamamlandı!")
 
         with col_ai_res:
-            st.subheader("Sonuçlar ve Karşılaştırma")
+            st.subheader("Canlı Önizleme ve Düzenleme")
+            
+            # Veri hazırlığı
             if st.session_state.ai_results:
-                for res in st.session_state.ai_results:
-                    with st.expander(f"📄 {res['title']}", expanded=True):
-                        c1, c2 = st.columns(2)
-                        
-                        if "new_desc" in res:
-                            with c1:
-                                st.caption("Mevcut Açıklama")
-                                st.text_area("Eski", res["original_desc"], height=150, disabled=True, key=f"old_{res['id']}")
-                            with c2:
-                                st.caption("AI Önerisi")
-                                st.text_area("Yeni", res["new_desc"], height=150, key=f"new_{res['id']}")
-                        
-                        if "new_meta" in res:
-                            st.info("Meta Önerisi:\n" + res["new_meta"])
-                
-                if st.button("Tümünü Kaydet (Shopify)", type="primary"):
-                    st.info("Kaydetme işlemi simüle edildi. (GraphQL entegrasyonu eklenecek)")
+                # AI sonuçları varsa onları kullan
+                display_data = st.session_state.ai_results
+            else:
+                # Yoksa mevcut verileri göster (boş yeni alanlarla)
+                display_data = []
+                for p in st.session_state.workspace_content:
+                    display_data.append({
+                        "id": p['id'],
+                        "title": p['title'],
+                        "original_desc": p.get('description', ''),
+                        "original_meta_title": p.get('seo', {}).get('title', ''),
+                        "original_meta_desc": p.get('seo', {}).get('description', ''),
+                        "new_desc": p.get('description', ''), # Başlangıçta eskisiyle aynı
+                        "new_meta_title": p.get('seo', {}).get('title', ''),
+                        "new_meta_desc": p.get('seo', {}).get('description', '')
+                    })
+
+            df_content = pd.DataFrame(display_data)
+            
+            # Data Editor
+            edited_content = st.data_editor(
+                df_content,
+                column_config={
+                    "title": st.column_config.TextColumn("Ürün Adı", disabled=True, width="medium"),
+                    "new_desc": st.column_config.TextColumn("Yeni Açıklama", width="large"),
+                    "new_meta_title": st.column_config.TextColumn("Yeni Meta Başlık", width="medium"),
+                    "new_meta_desc": st.column_config.TextColumn("Yeni Meta Açıklama", width="large"),
+                    "original_desc": None, # Gizle
+                    "original_meta_title": None,
+                    "original_meta_desc": None,
+                    "id": None
+                },
+                hide_index=True,
+                use_container_width=True,
+                height=500,
+                key="editor_content"
+            )
+            
+            col_save_desc, col_save_meta = st.columns(2)
+
+            with col_save_desc:
+                if st.button("Sadece Açıklamaları Kaydet", type="primary", use_container_width=True):
+                    progress_bar = st.progress(0)
+                    success_count = 0
+                    rows_to_update = edited_content.to_dict('records')
+                    total_rows = len(rows_to_update)
+
+                    for i, row in enumerate(rows_to_update):
+                        if row['new_desc'] != row['original_desc']:
+                            mutation = """
+                            mutation productUpdate($input: ProductInput!) {
+                                productUpdate(input: $input) {
+                                    product { id }
+                                    userErrors { field message }
+                                }
+                            }
+                            """
+                            input_data = {
+                                "id": row['id'],
+                                "descriptionHtml": row['new_desc']
+                            }
+                            res = shopify.execute_graphql(mutation, {"input": input_data})
+                            if res and not res.get('data', {}).get('productUpdate', {}).get('userErrors'):
+                                success_count += 1
+                            else:
+                                st.error(f"Hata ({row['title']}): {res}")
+                        progress_bar.progress((i + 1) / total_rows)
+                    st.success(f"{success_count} ürün açıklaması güncellendi!")
+
+            with col_save_meta:
+                if st.button("Sadece SEO Meta Kaydet", type="primary", use_container_width=True):
+                    progress_bar = st.progress(0)
+                    success_count = 0
+                    rows_to_update = edited_content.to_dict('records')
+                    total_rows = len(rows_to_update)
+
+                    for i, row in enumerate(rows_to_update):
+                        new_mt = row['new_meta_title'] if row['new_meta_title'] else ""
+                        orig_mt = row['original_meta_title'] if row['original_meta_title'] else ""
+                        new_md = row['new_meta_desc'] if row['new_meta_desc'] else ""
+                        orig_md = row['original_meta_desc'] if row['original_meta_desc'] else ""
+
+                        if new_mt != orig_mt or new_md != orig_md:
+                            mutation = """
+                            mutation productUpdate($input: ProductInput!) {
+                                productUpdate(input: $input) {
+                                    product { id }
+                                    userErrors { field message }
+                                }
+                            }
+                            """
+                            input_data = {
+                                "id": row['id'],
+                                "seo": {}
+                            }
+                            if new_mt != orig_mt:
+                                input_data['seo']['title'] = new_mt
+                            if new_md != orig_md:
+                                input_data['seo']['description'] = new_md
+                                
+                            res = shopify.execute_graphql(mutation, {"input": input_data})
+                            if res and not res.get('data', {}).get('productUpdate', {}).get('userErrors'):
+                                success_count += 1
+                            else:
+                                st.error(f"Hata ({row['title']}): {res}")
+                        progress_bar.progress((i + 1) / total_rows)
+                    st.success(f"{success_count} ürün SEO bilgisi güncellendi!")
 
 # ==========================================
 # 4. TAB: GÖRSEL SEO
@@ -435,22 +630,102 @@ with tab_content:
 with tab_image:
     st.header("🖼️ Görsel SEO (Alt Text)")
     
-    if not st.session_state.workspace_products:
-        st.warning("Lütfen önce 'Ürün Kokpiti' sekmesinden ürün seçin.")
+    if not st.session_state.workspace_image:
+        st.warning("Lütfen önce 'Ürün Kokpiti' sekmesinden ürün seçip 'Görsel SEO'ya Gönder' butonuna basın.")
     else:
-        st.info("Seçili ürünlerin görselleri için 'Ürün Adı + Varyant' kombinasyonu ile otomatik Alt Text üretilir.")
+        st.info("Seçili ürünlerin görselleri için 'Ürün Adı + Renk' kombinasyonu ile otomatik Alt Text üretilir.")
         
-        if st.button("Alt Metinleri Oluştur ve Önizle"):
-            img_preview = []
-            for p in st.session_state.workspace_products:
-                if p.get('featuredImage'):
-                    new_alt = f"{p['title']} - Detaylı Görünüm"
-                    img_preview.append({
-                        "Ürün": p['title'],
-                        "Görsel ID": p['featuredImage']['id'],
-                        "Mevcut Alt": p['featuredImage']['altText'],
-                        "Yeni Alt": new_alt
-                    })
-            
-            st.dataframe(pd.DataFrame(img_preview), use_container_width=True)
-            st.button("Görsel SEO'yu Uygula", type="primary")
+        col_img_act, col_img_table = st.columns([1, 3])
+        
+        with col_img_act:
+            if st.button("Alt Metinleri Oluştur", type="primary"):
+                img_preview = []
+                for p in st.session_state.workspace_image:
+                    if p.get('featuredImage'):
+                        # Renk bulma mantığı
+                        color_val = ""
+                        if 'options' in p:
+                            for opt in p['options']:
+                                if opt['name'].lower() in ['renk', 'color', 'colour']:
+                                    # İlk rengi alıyoruz (genellikle ana varyant)
+                                    if opt['values']:
+                                        color_val = opt['values'][0]
+                                    break
+                        
+                        # Renk varsa ekle, yoksa sadece ürün adı
+                        suffix = f" - {color_val}" if color_val else ""
+                        new_alt = f"{p['title']}{suffix} - Detaylı Görünüm"
+                        
+                        img_preview.append({
+                            "Görsel": p['featuredImage']['url'],
+                            "Ürün": p['title'],
+                            "Renk": color_val,
+                            "Mevcut Alt": p['featuredImage']['altText'],
+                            "Yeni Alt": new_alt,
+                            "id": p['id'],
+                            "image_id": p['featuredImage']['id']
+                        })
+                st.session_state.img_preview_data = img_preview
+                st.success("Alt metinler oluşturuldu!")
+
+        with col_img_table:
+            if 'img_preview_data' in st.session_state:
+                df_img = pd.DataFrame(st.session_state.img_preview_data)
+                
+                edited_img = st.data_editor(
+                    df_img,
+                    column_config={
+                        "Görsel": st.column_config.ImageColumn("Görsel", width="small"),
+                        "Ürün": st.column_config.TextColumn("Ürün", disabled=True, width="medium"),
+                        "Renk": st.column_config.TextColumn("Renk", disabled=True, width="small"),
+                        "Mevcut Alt": st.column_config.TextColumn("Mevcut Alt", disabled=True, width="medium"),
+                        "Yeni Alt": st.column_config.TextColumn("Yeni Alt (Düzenlenebilir)", width="large"),
+                        "id": None,
+                        "image_id": None
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=500
+                )
+                
+                if st.button("Görsel SEO'yu Uygula (Kaydet)", type="primary"):
+                    progress_bar = st.progress(0)
+                    success_count = 0
+                    rows = edited_img.to_dict('records')
+                    
+                    for i, row in enumerate(rows):
+                        if row['Yeni Alt'] != row['Mevcut Alt']:
+                            mutation = """
+                            mutation productImageUpdate($productId: ID!, $image: ImageInput!) {
+                                productImageUpdate(productId: $productId, image: $image) {
+                                    image {
+                                        id
+                                        altText
+                                    }
+                                    userErrors {
+                                        field
+                                        message
+                                    }
+                                }
+                            }
+                            """
+                            variables = {
+                                "productId": row['id'],
+                                "image": {
+                                    "id": row['image_id'],
+                                    "altText": row['Yeni Alt']
+                                }
+                            }
+                            
+                            res = shopify.execute_graphql(mutation, variables)
+                            if res and not res.get('data', {}).get('productImageUpdate', {}).get('userErrors'):
+                                success_count += 1
+                            else:
+                                st.error(f"Hata ({row['Ürün']}): {res}")
+                        
+                        progress_bar.progress((i + 1) / len(rows))
+                    
+                    st.success(f"{success_count} görsel alt metni güncellendi!")
+                    st.session_state.workspace_image = []
+                    if 'img_preview_data' in st.session_state:
+                        del st.session_state.img_preview_data
