@@ -57,18 +57,57 @@ class SEOManager:
         """
         Ürün açıklaması üretir.
         """
-        system_prompt = "Sen uzman bir e-ticaret SEO içerik yazarısın. Ürünleri satışa dönüştürecek, samimi ve profesyonel bir dille anlatırsın."
+        system_prompt = "Sen uzman bir E-ticaret SEO Editörüsün. Çıktıların doğrudan Shopify'da kullanılacak HTML formatında olmalıdır."
         
         user_content = f"""
-        Görevin: Aşağıdaki ürün için ürün açıklamasını kullanıcı talimatlarına göre oluşturmak veya düzenlemek.
+        Aşağıdaki kurallara uyarak ürün açıklamasını HTML formatında oluştur:
+
+        1. FORMATLAMA (HTML):
+        - Paragrafları <p> etiketi içine al.
+        - Satır sonlarında MUTLAKA <br> etiketi kullan. (Shopify'da alt satıra geçmek için \\n yetersizdir, <br> şarttır).
+        - "Özellikler" başlığını <strong> etiketi ile kalın yap.
+        - Özellikler listesindeki her maddeyi yeni bir satıra (<br>) yaz.
+
+        2. İÇERİK KURALLARI:
+        - Asla başlık (H1, H2) atma.
+        - Yapay zeka klişeleri kullanma.
+        - Müşteriye hitap eden samimi bir dil kullan.
         
+        3. VERİ AYIKLAMA:
+        - Aşağıdaki şablondaki verileri metinden bul ve doldur. Bulamazsan boş bırak.
+        - Asla "Bilgi yok" yazma.
+
+        4. SABİT İÇERİK:
+        - En alttaki "Tüm ürünlerimiz..." cümlelerini koru.
+
+        ---
+        İSTENEN HTML ÇIKTI ŞABLONU (Bunu doldur):
+
+        <p>[Buraya SEO uyumlu ürün açıklaması]</p>
+        <br>
+        <strong>Özellikler:</strong><br>
+        Manken Bedeni: [Değer]<br>
+        Manken Boyu: [Değer]<br>
+        Manken Ağırlığı: [Değer]<br>
+        Ürün Boyu: [Değer]<br>
+        Göğüs: [Değer]<br>
+        Bel: [Değer]<br>
+        Basen: [Değer]<br>
+        Kumaş İçeriği: [Değer]<br>
+        Kumaş Türü: [Değer]<br>
+        Yıkama: [Değer]<br>
+        Model Detayı: [Değer]<br>
+        <br>
+        <p>
+        Tüm ürünlerimiz esnek kumaştır.<br>
+        Tüm ürünlerimiz büyük beden ürünlerdir.
+        </p>
+
+        ---
+        HAM VERİ:
         Ürün Adı: {product_name}
         Mevcut Açıklama: {current_description}
-        Özellikler: {features}
-        
-        Kullanıcı Talimatları: {custom_prompt}
-        
-        ÖNEMLİ: Eğer kullanıcı talimatlarında "sadece şu kısmı değiştir", "beden tablosunu koru" gibi koruma talepleri varsa, ilgili kısımları değiştirmeden aynen bırak. Aksi takdirde en iyi satış metnini oluştur.
+        Ek Talimatlar: {custom_prompt}
         """
         
         return self.generate_text(system_prompt, user_content, image_url=image_url)
