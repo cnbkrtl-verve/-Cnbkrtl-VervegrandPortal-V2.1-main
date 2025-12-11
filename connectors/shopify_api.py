@@ -769,6 +769,137 @@ class ShopifyAPI:
             logging.error(f"Mevcut medya detayları alınırken hata: {e}")
             return []
 
+    def get_product_full_details(self, product_gid: str) -> dict:
+        """
+        Ürünün tüm detaylarını (varyantlar, seçenekler, resimler, etiketler vb.) çeker.
+        Kopyalama işlemi için kullanılır.
+        """
+        query = """
+        query getProductFullDetails($id: ID!) {
+            product(id: $id) {
+                id
+                title
+                descriptionHtml
+                vendor
+                productType
+                tags
+                handle
+                status
+                options {
+                    id
+                    name
+                    values
+                }
+                variants(first: 100) {
+                    edges {
+                        node {
+                            id
+                            sku
+                            title
+                            price
+                            compareAtPrice
+                            barcode
+                            weight
+                            weightUnit
+                            inventoryQuantity
+                            selectedOptions {
+                                name
+                                value
+                            }
+                        }
+                    }
+                }
+                images(first: 50) {
+                    edges {
+                        node {
+                            id
+                            altText
+                            originalSrc
+                        }
+                    }
+                }
+            }
+        }
+        """
+        try:
+            result = self.execute_graphql(query, {"id": product_gid})
+            return result.get("product")
+        except Exception as e:
+            logging.error(f"Ürün detayları çekilirken hata: {product_gid} - {e}")
+            return None
+
+    def get_products_page(self, limit=50, cursor=None, query=None):
+        """
+        Ürünleri sayfalı bir şekilde listelemek için kullanılır.
+        """
+        gql_query = """
+        query getProductsPage($first: Int!, $after: String, $query: String) {
+            products(first: $first, after: $after, query: $query, sortKey: CREATED_AT, reverse: true) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                edges {
+                    node {
+                        id
+                        title
+                        handle
+                        vendor
+                        productType
+                        status
+                        totalInventory
+                        featuredImage {
+                            url(transform: {maxWidth: 100, maxHeight: 100})
+                        }
+                        variants(first: 1) {
+                            edges {
+                                node {
+                                    price
+                                    sku
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        variables = {
+            "first": limit,
+            "after": cursor,
+            "query": query
+        }
+
+        try:
+            result = self.execute_graphql(gql_query, variables)
+            products_data = result.get("products", {})
+
+            products = []
+            for edge in products_data.get("edges", []):
+                node = edge["node"]
+                variant_node = node.get("variants", {}).get("edges", [])
+                first_variant = variant_node[0]["node"] if variant_node else {}
+
+                products.append({
+                    "id": node["id"],
+                    "title": node["title"],
+                    "sku": first_variant.get("sku", ""),
+                    "price": first_variant.get("price", ""),
+                    "inventory": node.get("totalInventory", 0),
+                    "vendor": node.get("vendor", ""),
+                    "image": node.get("featuredImage", {}).get("url") if node.get("featuredImage") else None,
+                    "status": node.get("status")
+                })
+
+            return {
+                "products": products,
+                "page_info": products_data.get("pageInfo", {})
+            }
+
+        except Exception as e:
+            logging.error(f"Ürün listesi alınırken hata: {e}")
+            return {"products": [], "page_info": {}}
+
     def get_default_location_id(self):
         if self.location_id: return self.location_id
         query = "query { locations(first: 1, query: \"status:active\") { edges { node { id } } } }"
