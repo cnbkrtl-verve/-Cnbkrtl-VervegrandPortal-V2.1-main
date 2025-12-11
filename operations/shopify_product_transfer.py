@@ -300,20 +300,7 @@ def sync_stock_only_shopify_to_shopify(source_api: ShopifyAPI, dest_api: Shopify
         progress_callback("Kaynak mağaza stok verileri çekiliyor...")
 
     # 1. Fetch Source Stocks (SKU -> Qty)
-    # Using `get_all_products_prices` method which returns sku, price, etc.
-    # But it returns list of dicts. We need a map.
-    source_products = source_api.get_all_products_prices(progress_callback=lambda msg: progress_callback(f"Kaynak: {msg}"))
-
-    # We need quantity. `get_all_products_prices` (checking implementation) fetches:
-    # node { id, variants { edges { node { id, sku, price, compareAtPrice } } } }
-    # It DOES NOT fetch inventoryQuantity!
-    # I need to either modify `get_all_products_prices` or create a new method `get_all_inventory_levels`.
-
-    # Let's check `get_all_products_for_export`. It fetches `inventoryQuantity`.
-    # "variants ... inventoryQuantity"
-    # Yes. Let's use `get_all_products_for_export` or implement a lighter one.
-
-    # Creating a lighter fetcher here for efficiency.
+    # Using a dedicated fetcher for efficiency (only SKU and Inventory)
     source_skus = _fetch_all_skus_with_inventory(source_api, "Kaynak")
 
     if progress_callback:

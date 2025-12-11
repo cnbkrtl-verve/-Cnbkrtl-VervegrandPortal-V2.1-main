@@ -9,9 +9,10 @@
     /* 🎨 Adaptive Color Palette based on Streamlit Theme */
     /* We use Streamlit's native variables where possible to support Light/Dark switching */
 
-    --primary-bg: var(--background-color);
-    --secondary-bg: var(--secondary-background-color);
-    --text-primary: var(--text-color);
+    --primary-bg: var(--background-color, #0e1117);
+    --secondary-bg: var(--secondary-background-color, #262730);
+    --text-primary: var(--text-color, #fafafa);
+    --text-secondary: #d1d5db; /* Light gray for secondary text */
 
     /* Accents - Keep these consistent but maybe adjust brightness */
     --accent-primary: #6366f1;
@@ -73,6 +74,7 @@ body {
     font-weight: 800;
     margin: 0;
     letter-spacing: -0.5px;
+    color: white !important;
 }
 
 .main-header p {
@@ -80,6 +82,7 @@ body {
     opacity: 0.9;
     margin-top: 0.5rem;
     font-weight: 400;
+    color: white !important;
 }
 
 /* ============== MODERN CARDS (Glassmorphism) ============== */
@@ -183,8 +186,36 @@ div[data-testid="stVerticalBlock"] > div > .stButton > button {
 
 /* ============== SIDEBAR ============== */
 [data-testid="stSidebar"] {
-    background-color: var(--secondary-bg);
+    background-color: var(--secondary-bg) !important;
     border-right: 1px solid var(--border-color);
+}
+
+/* Enhance text visibility in sidebar */
+[data-testid="stSidebar"] * {
+    z-index: 10000;
+}
+
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] div,
+[data-testid="stSidebar"] label {
+    color: var(--text-primary) !important;
+}
+
+/* Also ensure links are visible */
+[data-testid="stSidebar"] a {
+    color: var(--accent-primary) !important;
+}
+
+/* ============== HEADER (Top Bar) ============== */
+header[data-testid="stHeader"] {
+    background-color: var(--primary-bg) !important;
+    z-index: 99999;
+}
+
+/* Toolbar/Menu Text Color */
+header[data-testid="stHeader"] * {
+    color: var(--text-primary) !important;
 }
 
 /* ============== RESPONSIVE IMPROVEMENTS ============== */
