@@ -288,12 +288,10 @@ if 'start_transfer' in st.session_state and st.session_state['start_transfer']:
     failed_count = 0
     
     for i, order in enumerate(selected_orders):
-        with st.expander(f"İşleniyor: Sipariş {order['name']}", expanded=(i < 3)):  # İlk 3'ü açık göster
-            status_placeholder = st.empty()
-            with st.spinner(f"Sipariş {order['name']} hedef mağazaya aktarılıyor..."):
-                result = transfer_order(source_api, destination_api, order)
+        with st.status(f"⏳ İşleniyor: Sipariş {order['name']}...", expanded=(i < 3)) as status:
+            result = transfer_order(source_api, destination_api, order)
             
-            status_placeholder.container().write(f"**Sipariş {order['name']} Aktarım Logları:**")
+            st.write(f"**Sipariş {order['name']} Aktarım Logları:**")
             
             has_error = False
             has_warning = False
@@ -318,8 +316,13 @@ if 'start_transfer' in st.session_state and st.session_state['start_transfer']:
                 st.warning(f"⚠️ Transfer Kalitesi: %{transfer_quality:.1f} - Bazı ürünler eksik!")
             
             if has_error:
+                status.update(label=f"❌ Hata: Sipariş {order['name']}", state="error", expanded=True)
                 failed_count += 1
+            elif has_warning:
+                status.update(label=f"⚠️ Tamamlandı (Uyarılı): Sipariş {order['name']}", state="complete", expanded=False)
+                success_count += 1
             else:
+                status.update(label=f"✅ Tamamlandı: Sipariş {order['name']}", state="complete", expanded=False)
                 success_count += 1
         
         progress_bar.progress((i + 1) / total_orders)
