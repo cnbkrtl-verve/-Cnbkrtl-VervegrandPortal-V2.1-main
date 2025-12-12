@@ -176,7 +176,7 @@ if 'fetched_orders' in st.session_state and st.session_state['fetched_orders']:
             st.markdown(f"**{order_name}**")
         
         with col3:
-            st.text(customer_name)
+            st.markdown(customer_name)
         
         with col4:
             # Tarih formatla
@@ -185,21 +185,21 @@ if 'fetched_orders' in st.session_state and st.session_state['fetched_orders']:
                 formatted_date = date_obj.strftime("%d.%m.%Y %H:%M")
             except:
                 formatted_date = order_date[:16] if len(order_date) > 16 else order_date
-            st.text(formatted_date)
+            st.caption(formatted_date)
         
         with col5:
-            st.text(f"{float(total_price):.2f} {currency}")
+            st.markdown(f"**{float(total_price):.2f} {currency}**")
         
         with col6:
             # Durum badge'leri
             if financial_status == "PAID":
-                st.success("💳 Ödendi")
+                st.badge("Ödendi", icon="💳", color="green")
             elif financial_status == "PENDING":
-                st.warning("💳 Beklemede")
+                st.badge("Beklemede", icon="💳", color="yellow")
             elif financial_status == "REFUNDED":
-                st.error("💳 İade")
+                st.badge("İade", icon="💳", color="red")
             else:
-                st.info(f"💳 {financial_status}")
+                st.badge(financial_status, icon="💳", color="gray")
     
     # Seçilen siparişleri topla
     selected_orders = [order for order in orders if order['id'] in st.session_state['selected_order_ids']]
