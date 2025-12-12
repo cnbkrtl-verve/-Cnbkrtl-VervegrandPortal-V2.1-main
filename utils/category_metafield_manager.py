@@ -9,7 +9,7 @@ import re
 import logging
 import json
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 # Varyant helper fonksiyonlarını import et
 try:
@@ -44,7 +44,15 @@ class CategoryMetafieldManager:
     def _load_config(cls):
         if cls._config is None:
             try:
-                config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'category_config.json')
+                # Proje kök dizinini bul
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(current_dir)
+                config_path = os.path.join(project_root, 'category_config.json')
+
+                if not os.path.exists(config_path):
+                     # Fallback: belki utils içindedir (test ortamı vs)
+                     config_path = os.path.join(current_dir, '..', 'category_config.json')
+
                 with open(config_path, 'r', encoding='utf-8') as f:
                     cls._config = json.load(f)
             except Exception as e:
@@ -71,7 +79,7 @@ class CategoryMetafieldManager:
     @staticmethod
     def detect_category(product_title: str) -> Optional[str]:
         """
-        Ürün başlığından kategori tespit eder.
+        Ürün başlığından kategori tespit eder (PUANLAMA SİSTEMİ İLE).
         
         Args:
             product_title: Ürün başlığı
@@ -84,16 +92,33 @@ class CategoryMetafieldManager:
         
         title_lower = product_title.lower()
         keywords_map = CategoryMetafieldManager.get_category_keywords()
+        scores = {}
         
-        # Öncelik sırasına göre kontrol et
+        # Puanlama sistemi: Her eşleşen anahtar kelime için puan ver
+        # Uzun anahtar kelimeler daha spesifiktir, daha yüksek puan alır
         for category, keywords in keywords_map.items():
             for keyword in keywords:
                 if keyword.lower() in title_lower:
-                    logging.info(f"Kategori tespit edildi: '{category}' (Anahtar: '{keyword}')")
-                    return category
+                    # Temel puan: 10
+                    # Uzunluk bonusu: Kelime uzunluğu kadar puan
+                    score = 10 + len(keyword)
+
+                    # Tam eşleşme bonusu (kelime sınırları ile)
+                    # "shirt" kelimesi "t-shirt" içinde geçebilir, bunu ayırt etmek lazım
+                    # Ancak basit containment şimdilik yeterli, uzunluk puanı bunu çözer
+                    # (T-shirt (7 puan) > Shirt (5 puan))
+
+                    scores[category] = scores.get(category, 0) + score
+                    logging.debug(f"Kategori ipucu: '{keyword}' -> {category} (+{score})")
+
+        if not scores:
+            logging.warning(f"'{product_title}' için kategori tespit edilemedi")
+            return None
         
-        logging.warning(f"'{product_title}' için kategori tespit edilemedi")
-        return None
+        # En yüksek puanlı kategoriyi seç
+        best_category = max(scores, key=scores.get)
+        logging.info(f"Kategori tespit edildi: '{best_category}' (Puan: {scores[best_category]})")
+        return best_category
 
     @staticmethod
     def get_taxonomy_id(category: str) -> Optional[str]:
@@ -112,120 +137,102 @@ class CategoryMetafieldManager:
         category: str,
         product_description: str = "",
         variants: List[Dict] = None,
-        shopify_recommendations: Dict = None
+        shopify_recommendations: Dict = None,
+        tags: List[str] = None,
+        product_type: str = None
     ) -> Dict[str, str]:
         """
         🔍 ÇOK KATMANLI META ALAN ÇIKARMA SİSTEMİ
         
-        4 Katmanlı Veri Kaynağı (Öncelik Sırasına Göre):
-        1. Shopify Önerileri (En yüksek öncelik - Shopify'ın AI önerileri)
-        2. Varyant Bilgileri (Renk, Beden, Materyal seçenekleri)
-        3. Ürün Başlığı (Regex pattern matching ile detaylı analiz)
-        4. Ürün Açıklaması (Başlıkta bulunamayanlar için)
-        
-        Args:
-            product_title: Ürün başlığı
-            category: Tespit edilen kategori
-            product_description: Ürün açıklaması (HTML olabilir)
-            variants: Ürün varyantları [{title, options: [{name, value}]}]
-            shopify_recommendations: Shopify'ın önerdiği attribute'ler
-            
-        Returns:
-            Meta alan değerleri (key: value)
+        Veri Kaynakları (Öncelik Sırasına Göre):
+        1. Shopify Önerileri (En yüksek öncelik)
+        2. Varyant Bilgileri (Renk, Beden, Materyal)
+        3. Etiketler (Tags)
+        4. Ürün Başlığı (Regex)
+        5. Ürün Açıklaması (Regex)
         """
         values = {}
         title_lower = product_title.lower()
         desc_lower = product_description.lower() if product_description else ""
+        tags_lower = [t.lower() for t in tags] if tags else []
         
         config = CategoryMetafieldManager._load_config()
         patterns = config.get('patterns', {})
         
         # ============================================
-        # KATMAN 1: SHOPIFY ÖNERİLERİNDEN AL (EN YÜKSEK ÖNCELİK)
+        # 1. SHOPIFY ÖNERİLERİ
         # ============================================
         if shopify_recommendations:
             recommended_attrs = shopify_recommendations.get('recommended_attributes', [])
-            
-            # recommended_attrs bir liste of strings'dir (örn: ["Collar Type", "Sleeve Length"])
-            # Bu attribute isimleri sadece hangi alanların önemli olduğunu gösterir
-            # Değerleri başlık, varyant veya açıklamadan çıkaracağız
-            
-            # Şimdilik Shopify attribute isimlerini logla (gelecekte API'den değer de alabiliriz)
             if recommended_attrs:
                 logging.info(f"✨ Shopify önerilen attribute'ler: {', '.join(recommended_attrs)}")
-                # Not: Shopify sadece attribute ismi öneriyor, değer önermiyor
-                # Değerleri diğer katmanlardan (varyant, başlık, açıklama) çıkaracağız
         
         # ============================================
-        # KATMAN 2: VARYANT BİLGİLERİNDEN AL
+        # 2. VARYANT BİLGİLERİ
         # ============================================
         if variants:
-            # Renk bilgisini çıkar (zaten get_color_list_as_string var)
+            # Renk
             color_value = get_color_list_as_string(variants)
             if color_value and 'renk' not in values:
                 values['renk'] = color_value
-                logging.info(f"🎨 Varyantlardan renk çıkarıldı: '{color_value}'")
             
-            # Diğer varyant seçeneklerini de kontrol et
+            # Beden ve Kumaş
+            sizes = set()
             for variant in variants:
                 options = variant.get('options', [])
                 for option in options:
-                    option_name = option.get('name', '').lower()
-                    option_value = option.get('value', '')
+                    name = option.get('name', '').lower()
+                    val = option.get('value', '')
                     
-                    # Beden/Size
-                    if option_name in ['size', 'beden', 'boyut'] and 'beden' not in values:
-                        # Varyantlardan beden listesi çıkar
-                        sizes = set()
-                        for v in variants:
-                            for opt in v.get('options', []):
-                                if opt.get('name', '').lower() in ['size', 'beden', 'boyut']:
-                                    sizes.add(opt.get('value', ''))
-                        if sizes:
-                            values['beden'] = ', '.join(sorted(list(sizes)))
-                            logging.info(f"📏 Varyantlardan beden çıkarıldı: '{values['beden']}'")
+                    if name in ['size', 'beden', 'boyut']:
+                        sizes.add(val)
                     
-                    # Kumaş/Material
-                    if option_name in ['material', 'kumaş', 'kumaş tipi', 'fabric'] and 'kumaş' not in values:
-                        values['kumaş'] = option_value
-                        logging.info(f"🧵 Varyantlardan kumaş çıkarıldı: '{option_value}'")
-        
+                    if name in ['material', 'kumaş', 'kumaş tipi', 'fabric'] and 'kumaş' not in values:
+                        values['kumaş'] = val
+
+            if sizes and 'beden' not in values:
+                values['beden'] = ', '.join(sorted(list(sizes)))
+
         # ============================================
-        # KATMAN 3: BAŞLIKTAN REGEX İLE ÇIKAR
+        # 3. TAGS & PRODUCT TYPE
+        # ============================================
+        # Etiketlerden desen, kumaş vb. yakalama
+        for field, pattern_list in patterns.items():
+            if field in values: continue
+
+            # Tags içinde ara
+            for tag in tags_lower:
+                for pattern, value in pattern_list:
+                    if re.search(pattern, tag):
+                        values[field] = value
+                        break
+                if field in values: break
+
+        # ============================================
+        # 4. BAŞLIKTAN REGEX
         # ============================================
         for field, pattern_list in patterns.items():
-            if field not in values:  # Sadece henüz dolmamış alanları doldur
+            if field not in values:
                 for pattern, value in pattern_list:
                     if re.search(pattern, title_lower):
                         values[field] = value
-                        logging.info(f"📝 Başlıktan çıkarıldı: {field} = '{value}'")
-                        break  # İlk eşleşmeyi al
+                        break
         
         # ============================================
-        # KATMAN 4: AÇIKLAMADAN ÇIKAR (SON ÇARE)
+        # 5. AÇIKLAMADAN REGEX
         # ============================================
         if desc_lower:
             for field, pattern_list in patterns.items():
-                if field not in values:  # Sadece henüz dolmamış alanları doldur
+                if field not in values:
                     for pattern, value in pattern_list:
                         if re.search(pattern, desc_lower):
                             values[field] = value
-                            logging.info(f"📄 Açıklamadan çıkarıldı: {field} = '{value}'")
-                            break  # İlk eşleşmeyi al
+                            break
         
         return values
     
     @staticmethod
     def get_metafields_for_category(category: str) -> Dict[str, dict]:
-        """
-        Belirtilen kategori için meta alan şablonlarını döndürür.
-        
-        Args:
-            category: Kategori adı
-            
-        Returns:
-            Meta alan şablonları
-        """
         return CategoryMetafieldManager.get_category_metafields().get(category, {})
     
     @staticmethod
@@ -234,92 +241,45 @@ class CategoryMetafieldManager:
         product_title: str,
         product_description: str = "",
         variants: List[Dict] = None,
-        shopify_recommendations: Dict = None
+        shopify_recommendations: Dict = None,
+        tags: List[str] = None,
+        product_type: str = None
     ) -> List[Dict]:
         """
         Shopify GraphQL için metafield input formatını hazırlar.
-        
-        Args:
-            category: Ürün kategorisi
-            product_title: Ürün başlığı
-            product_description: Ürün açıklaması
-            variants: Ürün varyantları (renk bilgisi için)
-            shopify_recommendations: Shopify AI önerileri
-            
-        Returns:
-            Shopify metafield input listesi
         """
         metafield_templates = CategoryMetafieldManager.get_metafields_for_category(category)
         
-        # 🌟 UPGRADED: Tüm veri kaynaklarını kullan
         extracted_values = CategoryMetafieldManager.extract_metafield_values(
             product_title=product_title,
             category=category,
             product_description=product_description,
             variants=variants,
-            shopify_recommendations=shopify_recommendations
+            shopify_recommendations=shopify_recommendations,
+            tags=tags,
+            product_type=product_type
         )
         
         shopify_metafields = []
         
         for field_key, template in metafield_templates.items():
-            # Meta alan key'ini çıkar (custom.yaka_tipi -> yaka_tipi)
             key = template['key']
             
-            # Çıkarılan değerler içinde varsa kullan
             if key in extracted_values:
                 value = extracted_values[key]
-                
                 shopify_metafields.append({
                     'namespace': template['namespace'],
                     'key': template['key'],
                     'value': value,
                     'type': template['type']
                 })
-                
-                logging.info(f"Shopify metafield hazırlandı: {template['namespace']}.{template['key']} = '{value}'")
         
         return shopify_metafields
-    
+
     @staticmethod
     def get_category_summary() -> Dict[str, int]:
-        """
-        Kategori istatistiklerini döndürür.
-        
-        Returns:
-            Kategori adı ve meta alan sayısı
-        """
         summary = {}
         metafields = CategoryMetafieldManager.get_category_metafields()
         for category, fields in metafields.items():
             summary[category] = len(fields)
         return summary
-
-
-# Kullanım örneği
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    
-    # Test
-    test_titles = [
-        "Büyük Beden Uzun Kollu Leopar Desenli Diz Üstü Elbise 285058",
-        "Büyük Beden Bisiklet Yaka Yarım Kollu Düz Renk T-shirt 303734",
-        "Büyük Beden V Yaka Kısa Kol Çiçekli Bluz 256478",
-        "Büyük Beden Yüksek Bel Dar Paça Siyah Pantolon 123456"
-    ]
-    
-    for title in test_titles:
-        print(f"\n{'='*60}")
-        print(f"Ürün: {title}")
-        print(f"{'='*60}")
-        
-        # Kategori tespit
-        category = CategoryMetafieldManager.detect_category(title)
-        print(f"Kategori: {category}")
-        
-        if category:
-            # Meta alanları hazırla
-            metafields = CategoryMetafieldManager.prepare_metafields_for_shopify(category, title)
-            print(f"\nOluşturulan Meta Alanlar ({len(metafields)}):")
-            for mf in metafields:
-                print(f"  - {mf['namespace']}.{mf['key']} = '{mf['value']}'")
