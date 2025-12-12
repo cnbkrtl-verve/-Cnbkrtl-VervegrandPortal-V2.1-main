@@ -61,6 +61,7 @@ def get_sentos_data_by_base_code(sentos_api, model_codes_to_fetch):
     # GÜNCELLENDİ:
     Verilen ANA ürün kodları listesini kullanarak Sentos'tan ALIŞ ve SATIŞ fiyatlarını 
     ve doğrulanmış ana kod bilgisini çeker.
+    ⚡ OPTIMIZATION: ThreadPoolExecutor kullanan toplu çekim fonksiyonu
     """
     data_map = {}
     unique_model_codes = list(set(model_codes_to_fetch))
@@ -71,10 +72,18 @@ def get_sentos_data_by_base_code(sentos_api, model_codes_to_fetch):
     # GÜNCELLENDİ: Progress bar metni güncellendi.
     progress_bar = st.progress(0, "Sentos'tan alış ve satış fiyatları çekiliyor...")
     
-    for i, code in enumerate(unique_model_codes):
-        if not code: continue
-        try:
-            sentos_product = sentos_api.get_product_by_sku(code)
+    def update_progress(current, total):
+        progress_bar.progress(current / total, f"Sentos'tan fiyatlar çekiliyor... ({current}/{total})")
+
+    # ⚡ OPTIMIZATION: Paralel işlem ile verileri çek
+    try:
+        products_map = sentos_api.get_products_by_skus_bulk(
+            unique_model_codes,
+            max_workers=10,
+            progress_callback=update_progress
+        )
+
+        for code, sentos_product in products_map.items():
             if sentos_product:
                 # Alış Fiyatı (purchase_price) bulma mantığı
                 purchase_price = None
@@ -111,11 +120,9 @@ def get_sentos_data_by_base_code(sentos_api, model_codes_to_fetch):
                     'purchase_price': float(str(purchase_price).replace(',', '.')) if purchase_price is not None else None,
                     'selling_price': float(str(selling_price).replace(',', '.')) if selling_price is not None else None
                 }
-        except Exception as e:
-            logging.warning(f"Sentos'tan '{code}' SKU'su için veri çekilirken bir hata oluştu: {e}")
-            pass
-        # GÜNCELLENDİ: Progress bar metni güncellendi.
-        progress_bar.progress((i + 1) / total_codes, f"Sentos'tan fiyatlar çekiliyor... ({i+1}/{total_codes})")
+    except Exception as e:
+        logging.error(f"Toplu veri çekme hatası: {e}")
+        st.error(f"Sentos'tan veri çekerken hata oluştu: {e}")
     
     progress_bar.empty()
     return data_map
