@@ -94,13 +94,16 @@ for loc in shopify_locations:
             
             if selected_warehouse_id:
                 with st.spinner("Eşleştirme güncelleniyor..."):
-                    # Bu fonksiyonun Sentos API'sinde gerçek bir karşılığı olmalı.
-                    # Örnek: result = sentos_api.update_shopify_location_mapping(1, loc['id'], selected_warehouse_id)
-                    # if result.get('success'):
-                    #     st.success(f"`{loc['name']}` konumu, `{selected_warehouse_name}` deposu ile başarıyla eşleştirildi!")
-                    # else:
-                    #     st.error(f"Eşleştirme başarısız: {result.get('message')}")
-                    st.warning("Bu özellik henüz aktif değil. `sentos_api.py` içindeki ilgili fonksiyonun, Sentos panelinin kullandığı gerçek iç API isteği ile güncellenmesi gerekmektedir.")
+                    # 1 = Sentos'taki Shopify mağaza ID'si (Sabit veya dinamik olmalı)
+                    # Şimdilik varsayılan olarak 1 gönderiyoruz, gerekirse ayardan alınabilir.
+                    result = sentos_api.update_shopify_location_mapping(1, loc['id'], selected_warehouse_id)
+
+                    if result.get('success'):
+                        st.success(f"`{loc['name']}` konumu, `{selected_warehouse_name}` deposu ile başarıyla eşleştirildi!")
+                        # Opsiyonel: Verileri yeniden yükle
+                        # st.cache_data.clear()
+                    else:
+                        st.error(f"Eşleştirme başarısız: {result.get('message')}")
 
 
 st.markdown("---")
