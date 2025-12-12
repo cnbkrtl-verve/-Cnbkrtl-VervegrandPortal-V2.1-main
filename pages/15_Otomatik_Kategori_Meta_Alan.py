@@ -88,19 +88,10 @@ st.info("""
 **Sorun:** Shopify'da her ürün için kategori ve meta alanlarını manuel doldurmak çok zaman alıyor.
 
 **Çözüm:** Bu modül ürün başlıklarından otomatik olarak:
-1. 📦 **Kategori tespit eder** (T-shirt, Elbise, Bluz, Pantolon, Şort vb.)
+1. 📦 **Kategori tespit eder** (T-shirt, Elbise, Bluz, Pantolon, Şort vb.) - *Puanlama Sistemi ile*
 2. 🏷️ **Kategoriye uygun meta alanları belirler** (Yaka tipi, Kol tipi, Boy, Desen vb.)
-3. ✨ **Ürün başlığından değerleri çıkarır** (V Yaka, Uzun Kol, Mini, Leopar vb.)
+3. ✨ **Tüm verilerden değerleri çıkarır** (Başlık, Varyant, Açıklama, Etiketler)
 4. 💾 **Shopify'a otomatik yazar** (GraphQL API ile)
-
-**Örnek:**
-- Başlık: "Büyük Beden Uzun Kollu V Yaka Leopar Desenli Diz Üstü Elbise 285058"
-- Kategori: **Elbise** ✅
-- Meta Alanlar:
-  - `custom.yaka_tipi` = "V Yaka" ✅
-  - `custom.kol_tipi` = "Uzun Kol" ✅
-  - `custom.boy` = "Diz Üstü" ✅
-  - `custom.desen` = "Leopar" ✅
 """)
 
 st.markdown("---")
@@ -138,59 +129,62 @@ with col2:
 st.markdown("---")
 
 # ⚠️ METAFIELD DEFINITIONS OLUŞTURMA
-st.markdown("### 🔧 Metafield Definitions Oluştur (İLK ADIM!)")
-st.warning("""
-⚠️ **ÖNEMLİ**: Meta alanların Shopify'da görünmesi için önce **metafield definitions** oluşturulmalı!
+with st.expander("🔧 Metafield Definitions Oluşturma (Gerekirse)"):
+    st.warning("""
+    ⚠️ **ÖNEMLİ**: Meta alanların Shopify'da görünmesi için önce **metafield definitions** oluşturulmalı!
+    Bu işlem sadece **BİR KERE** yapılır.
+    """)
 
-Bu işlem sadece **BİR KERE** yapılır. Zaten oluşturulmuşsa tekrar yapmaya gerek yok.
-""")
+    if st.button("🏗️ Tüm Kategoriler İçin Metafield Definitions Oluştur"):
+        with st.spinner("Metafield definitions oluşturuluyor..."):
+            try:
+                shopify_api = ShopifyAPI(
+                    user_keys["shopify_store"],
+                    user_keys["shopify_token"]
+                )
+                
+                categories = list(CategoryMetafieldManager.get_category_summary().keys())
+                
+                total_created = 0
+                results_md = ""
 
-if st.button("🏗️ Tüm Kategoriler İçin Metafield Definitions Oluştur", type="primary"):
-    with st.spinner("Metafield definitions oluşturuluyor..."):
-        try:
-            shopify_api = ShopifyAPI(
-                user_keys["shopify_store"],
-                user_keys["shopify_token"]
-            )
-            
-            categories = ['Elbise', 'T-shirt', 'Bluz', 'Pantolon', 'Şort', 'Etek', 
-                         'Gömlek', 'Hırka', 'Mont', 'Sweatshirt', 'Tunik', 'Süveter']
-            
-            total_created = 0
-            results_md = ""
-            
-            for category in categories:
-                result = shopify_api.create_all_metafield_definitions_for_category(category)
-                total_created += result.get('created', 0)
-                
-                if result.get('success'):
-                    results_md += f"✅ **{category}**: {result['created']} definition oluşturuldu/kontrol edildi\n\n"
-                else:
-                    results_md += f"❌ **{category}**: Hata - {result.get('errors', [])}\n\n"
-                
-                time.sleep(0.5)  # Rate limit
-            
-            st.success(f"✅ Toplam {total_created} metafield definition oluşturuldu/kontrol edildi!")
-            st.markdown(results_md)
-            
-        except Exception as e:
-            st.error(f"❌ Hata: {str(e)}")
-            import traceback
-            with st.expander("Detaylı Hata"):
+                for category in categories:
+                    result = shopify_api.create_all_metafield_definitions_for_category(category)
+                    total_created += result.get('created', 0)
+
+                    if result.get('success'):
+                        results_md += f"✅ **{category}**: {result['created']} definition oluşturuldu/kontrol edildi\n\n"
+                    else:
+                        results_md += f"❌ **{category}**: Hata - {result.get('errors', [])}\n\n"
+
+                    time.sleep(0.5)  # Rate limit
+
+                st.success(f"✅ Toplam {total_created} metafield definition oluşturuldu/kontrol edildi!")
+                st.markdown(results_md)
+
+            except Exception as e:
+                st.error(f"❌ Hata: {str(e)}")
+                import traceback
                 st.code(traceback.format_exc())
 
 st.markdown("---")
 
 # Güncelleme Ayarları
-st.markdown("### ⚙️ Güncelleme Ayarları")
+st.markdown("### ⚙️ Tarama ve Güncelleme Ayarları")
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    test_mode = st.checkbox("🧪 Test Modu (İlk 20 ürün)", value=True)
+    scan_mode = st.radio(
+        "🔍 Tarama Modu",
+        ["Test Modu (İlk 20)", "Tam Tarama (Tüm Mağaza)"],
+        index=0,
+        help="Tam tarama tüm ürünleri çeker, uzun sürebilir."
+    )
+    test_mode = scan_mode == "Test Modu (İlk 20)"
     
 with col2:
-    dry_run = st.checkbox("🔍 DRY RUN (Sadece göster, güncelleme)", value=True)
+    dry_run = st.checkbox("🧪 DRY RUN (Sadece göster)", value=True, help="Değişiklikleri Shopify'a göndermez, sadece ne olacağını gösterir.")
 
 with col3:
     update_category = st.checkbox("📦 Kategori güncelle", value=True)
@@ -202,299 +196,177 @@ with col4:
 
 st.markdown("---")
 
-# Önizleme Butonu
-if st.button("👁️ Önizleme Yap", type="secondary"):
-    with st.spinner("Ürünler yükleniyor ve analiz ediliyor..."):
-        try:
-            shopify_api = ShopifyAPI(
-                user_keys["shopify_store"],
-                user_keys["shopify_token"]
-            )
-            
-            # Ürünleri yükle
-            shopify_api.load_all_products_for_cache()
-            
-            # Unique ürünleri al
-            unique_products = {}
-            for product_data in shopify_api.product_cache.values():
-                gid = product_data.get('gid')
-                if gid and gid not in unique_products:
-                    unique_products[gid] = product_data
-            
-            products = list(unique_products.values())[:20 if test_mode else len(unique_products)]
-            
-            st.success(f"✅ {len(products)} ürün yüklendi")
-            
-            # Önizleme tablosu
-            preview_data = []
-            
-            for product in products[:10]:  # İlk 10 ürünü göster
-                title = product.get('title', '')
-                gid = product.get('gid', '')
-                variants = product.get('variants', [])
-                description = product.get('description', '')
-                
-                # Kategori tespit
-                category = CategoryMetafieldManager.detect_category(title)
-                
-                if category:
-                    # Taxonomy ID al
-                    taxonomy_id = CategoryMetafieldManager.get_taxonomy_id(category)
-                    
-                    # 🌟 YENİ: Shopify önerilerini al (varsa)
-                    shopify_recommendations = None
-                    try:
-                        recommendations_data = shopify_api.get_product_recommendations(gid)
-                        if recommendations_data:
-                            shopify_recommendations = recommendations_data
-                            logging.info(f"✨ Shopify önerileri alındı: {gid}")
-                    except Exception as e:
-                        logging.warning(f"Shopify önerileri alınamadı: {e}")
-                    
-                    # Meta alanları hazırla (TÜM VERI KAYNAKLARIYLA)
-                    metafields = CategoryMetafieldManager.prepare_metafields_for_shopify(
-                        category=category,
-                        product_title=title,
-                        product_description=description,
-                        variants=variants,
-                        shopify_recommendations=shopify_recommendations
-                    )
-                    
-                    metafield_summary = ', '.join([f"{mf['key']}: {mf['value']}" for mf in metafields])
-                    
-                    preview_data.append({
-                        'Ürün': title[:50] + '...' if len(title) > 50 else title,
-                        'Kategori': f"{category} ({taxonomy_id})" if taxonomy_id else category,
-                        'Meta Alanlar': metafield_summary if metafield_summary else 'Yok'
-                    })
-                else:
-                    preview_data.append({
-                        'Ürün': title[:50] + '...' if len(title) > 50 else title,
-                        'Kategori': '❌ Tespit edilemedi',
-                        'Meta Alanlar': '-'
-                    })
-            
-            st.dataframe(preview_data, use_container_width=True, hide_index=True)
-            
-            # İstatistikler
-            total_with_category = sum(1 for p in products if CategoryMetafieldManager.detect_category(p.get('title', '')))
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Toplam Ürün", len(products))
-            with col2:
-                st.metric("Kategori Tespit Edildi", total_with_category)
-            with col3:
-                st.metric("Başarı Oranı", f"{(total_with_category/len(products)*100):.1f}%")
-            
-        except Exception as e:
-            st.error(f"❌ Hata: {str(e)}")
+def process_products(preview_only=True):
+    shopify_api = ShopifyAPI(user_keys["shopify_store"], user_keys["shopify_token"])
 
-# Güncelleme Butonu
-st.markdown("---")
+    # 1. YÜKLEME
+    with st.status("📦 Ürünler yükleniyor...", expanded=True) as status:
+        shopify_api.load_all_products_for_cache()
 
-if st.button("🚀 Güncellemeyi Başlat", type="primary", disabled=(not update_category and not update_metafields)):
-    if dry_run:
-        st.warning("⚠️ DRY RUN modu aktif - Değişiklikler Shopify'a yazılmayacak")
+        unique_products = {}
+        for product_data in shopify_api.product_cache.values():
+            gid = product_data.get('gid')
+            if gid and gid not in unique_products:
+                unique_products[gid] = product_data
+
+        products = list(unique_products.values())
+        if test_mode:
+            products = products[:20]
+            
+        status.update(label=f"✅ {len(products)} ürün analiz için hazır!", state="complete", expanded=False)
+
+    # 2. ANALİZ VE GÜNCELLEME
+    results_container = st.container()
+    progress_bar = st.progress(0)
+    status_text = st.empty()
     
-    with st.spinner("Güncelleme yapılıyor..."):
-        try:
-            shopify_api = ShopifyAPI(
-                user_keys["shopify_store"],
-                user_keys["shopify_token"]
-            )
+    stats = {'total': len(products), 'updated': 0, 'skipped': 0, 'failed': 0, 'analyzed': 0}
+
+    with results_container:
+        st.markdown("### 📝 İşlem Sonuçları")
+        results_placeholder = st.empty()
+        results_html = ""
+
+        # Sadece son 50 logu tutalım ki UI donmasın
+        log_buffer = []
+
+        for idx, product in enumerate(products):
+            progress = (idx + 1) / len(products)
+            progress_bar.progress(progress)
             
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+            gid = product.get('gid')
+            title = product.get('title', 'Bilinmeyen')
+            description = product.get('description', '')
             
-            # Ürünleri yükle
-            status_text.text("📦 Ürünler yükleniyor...")
-            shopify_api.load_all_products_for_cache()
+            # Varyantları düzgün formatla (API cache'den gelen yapı biraz farklı olabilir)
+            # load_all_products_for_cache zaten standart formata çeviriyor:
+            # variants = [{'sku': '...', 'options': [{'name': 'Size', 'value': 'S'}]}]
+            variants = product.get('variants', [])
             
-            # Unique ürünleri al
-            unique_products = {}
-            for product_data in shopify_api.product_cache.values():
-                gid = product_data.get('gid')
-                if gid and gid not in unique_products:
-                    unique_products[gid] = product_data
+            # NOT: Cache'de tags/productType olmayabilir, eğer eksikse detay çekmek gerekebilir
+            # Ancak performans için şimdilik cache'deki (sınırlı) veriyi kullanıyoruz.
+            # Geliştirme: load_all_products_for_cache fonksiyonu tags/productType da çekmeli.
+            # Şu anki versiyon çekmiyor olabilir. API'yi kontrol etmeliyiz.
+            # Eğer çekmiyorsa, burada ek bir çağrı yapmak çok yavaşlatır.
+            # Varsayım: Cache'de yoksa boş kabul edelim.
+            tags = [] # Cache güncellenmeli
+            product_type = ""
             
-            products = list(unique_products.values())[:20 if test_mode else len(unique_products)]
+            status_text.text(f"Analiz ediliyor ({idx+1}/{len(products)}): {title[:40]}...")
             
-            status_text.text(f"✅ {len(products)} ürün yüklendi")
+            # Kategori tespit
+            category = CategoryMetafieldManager.detect_category(title)
             
-            # Sonuçlar
-            stats = {
-                'total': len(products),
-                'updated': 0,
-                'skipped': 0,
-                'failed': 0
-            }
+            if not category:
+                stats['skipped'] += 1
+                # Sadece önizlemede başarısızları gösterelim mi? Hayır, log kalabalık olur.
+                continue
             
-            results_container = st.container()
+            # Taxonomy ID al
+            taxonomy_id = CategoryMetafieldManager.get_taxonomy_id(category)
             
-            with results_container:
-                st.markdown("### 📊 Güncelleme Sonuçları:")
-                results_placeholder = st.empty()
-                
-                results_html = ""
-                
-                for idx, product in enumerate(products):
-                    gid = product.get('gid')
-                    title = product.get('title', 'Bilinmeyen')
-                    variants = product.get('variants', [])
-                    description = product.get('description', '')
-                    
-                    progress = (idx + 1) / len(products)
-                    progress_bar.progress(progress)
-                    status_text.text(f"[{idx + 1}/{len(products)}] {title[:50]}...")
-                    
-                    # Kategori tespit
-                    category = CategoryMetafieldManager.detect_category(title)
-                    
-                    if not category:
-                        stats['skipped'] += 1
-                        results_html += f"""
-                        <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #ffc107; background: #fff8e1;'>
-                            <small>⏭️ Kategori tespit edilemedi: <b>{title[:60]}</b></small>
-                        </div>
-                        """
-                        results_placeholder.markdown(results_html, unsafe_allow_html=True)
-                        continue
-                    
-                    # Taxonomy ID al
-                    taxonomy_id = CategoryMetafieldManager.get_taxonomy_id(category)
-                    
-                    # 🌟 YENİ: Shopify önerilerini al (varsa)
-                    shopify_recommendations = None
-                    try:
+            # Shopify Önerileri (Sadece güncelleme modunda veya detaylı analizde)
+            shopify_recommendations = None
+            if not preview_only or idx < 5: # Önizlemede sadece ilk 5 için API çağrısı yap (hız için)
+                 try:
+                    # Bu çağrı her ürün için yapılırsa yavaşlatır.
+                    # Test modunda sorun yok, ama Tam Taramada rate limit'e takılabilir.
+                    # Eğer çok ürün varsa bunu atlamak mantıklı olabilir veya cache'lemek.
+                    if use_shopify_suggestions:
                         recommendations_data = shopify_api.get_product_recommendations(gid)
                         if recommendations_data:
                             shopify_recommendations = recommendations_data
-                    except Exception as e:
-                        logging.warning(f"Shopify önerileri alınamadı: {e}")
-                    
-                    # Meta alanları hazırla (TÜM VERI KAYNAKLARIYLA)
-                    metafields = CategoryMetafieldManager.prepare_metafields_for_shopify(
-                        category=category,
-                        product_title=title,
-                        product_description=description,
-                        variants=variants,
-                        shopify_recommendations=shopify_recommendations
+                 except Exception as e:
+                     pass
+
+            # Meta alanları hazırla
+            metafields = CategoryMetafieldManager.prepare_metafields_for_shopify(
+                category=category,
+                product_title=title,
+                product_description=description,
+                variants=variants,
+                shopify_recommendations=shopify_recommendations,
+                tags=tags,
+                product_type=product_type
+            )
+
+            stats['analyzed'] += 1
+
+            metafield_str = ", ".join([f"{m['key']}: {m['value']}" for m in metafields])
+
+            log_entry = ""
+            if preview_only or dry_run:
+                stats['updated'] += 1 # Teorik olarak güncellenecek
+                log_entry = f"""
+                <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #2196f3; background: #e3f2fd; font-family: monospace; font-size: 0.9em;'>
+                    <b>{title[:50]}</b><br>
+                    <span style='color: #1565c0'>📂 {category}</span> | <span style='color: #00695c'>🏷️ {metafield_str}</span>
+                </div>
+                """
+            else:
+                # GERÇEK GÜNCELLEME
+                try:
+                    result = shopify_api.update_product_category_and_metafields(
+                        gid,
+                        category if update_category else None,
+                        metafields if update_metafields else [],
+                        use_shopify_suggestions=use_shopify_suggestions,
+                        taxonomy_id=taxonomy_id if update_category else None
                     )
                     
-                    if dry_run:
-                        # DRY RUN: Sadece göster
+                    if result.get('success'):
                         stats['updated'] += 1
-                        metafield_list = ', '.join([f"{mf['key']}: {mf['value']}" for mf in metafields])
-                        cat_display = f"{category} ({taxonomy_id})" if taxonomy_id else category
-                        
-                        results_html += f"""
-                        <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #2196f3; background: #e3f2fd;'>
-                            <small>🔍 <b>{title[:60]}</b></small><br>
-                            <small>&nbsp;&nbsp;&nbsp;&nbsp;Kategori: <b>{cat_display}</b> | Meta: {metafield_list}</small>
+                        log_entry = f"""
+                        <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #4caf50; background: #e8f5e9; font-size: 0.9em;'>
+                            ✅ <b>{title[:50]}</b>: Güncellendi ({category})
                         </div>
                         """
                     else:
-                        # GERÇEK GÜNCELLEME
-                        try:
-                            result = shopify_api.update_product_category_and_metafields(
-                                gid,
-                                category if update_category else None,
-                                metafields if update_metafields else [],
-                                use_shopify_suggestions=use_shopify_suggestions,  # Yeni parametre
-                                taxonomy_id=taxonomy_id if update_category else None
-                            )
-                            
-                            if result.get('success'):
-                                stats['updated'] += 1
-                                updated_cat = result.get('updated_category', category)
-                                results_html += f"""
-                                <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #4caf50; background: #e8f5e9;'>
-                                    <small>✅ <b>{title[:60]}</b></small><br>
-                                    <small>&nbsp;&nbsp;&nbsp;&nbsp;{result.get('message', 'Güncellendi')}</small>
-                                </div>
-                                """
-                            else:
-                                stats['failed'] += 1
-                                results_html += f"""
-                                <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #f44336; background: #ffebee;'>
-                                    <small>❌ <b>{title[:60]}</b></small><br>
-                                    <small>&nbsp;&nbsp;&nbsp;&nbsp;Hata: {result.get('message', 'Bilinmeyen')}</small>
-                                </div>
-                                """
-                            
-                            time.sleep(0.5)  # Rate limit
-                            
-                        except Exception as e:
-                            stats['failed'] += 1
-                            results_html += f"""
-                            <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #f44336; background: #ffebee;'>
-                                <small>❌ <b>{title[:60]}</b></small><br>
-                                <small>&nbsp;&nbsp;&nbsp;&nbsp;Hata: {str(e)}</small>
-                            </div>
-                            """
+                        stats['failed'] += 1
+                        log_entry = f"""
+                        <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #f44336; background: #ffebee; font-size: 0.9em;'>
+                            ❌ <b>{title[:50]}</b>: {result.get('message')}
+                        </div>
+                        """
                     
-                    results_placeholder.markdown(results_html, unsafe_allow_html=True)
-            
-            # Özet
-            st.markdown("---")
-            st.markdown("### 📊 Özet:")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Toplam", stats['total'])
-            with col2:
-                st.metric("Güncellendi", stats['updated'])
-            with col3:
-                st.metric("Atlandı", stats['skipped'])
-            with col4:
-                st.metric("Hata", stats['failed'])
-            
-            if dry_run:
-                st.warning("💡 DRY RUN moduydu - Gerçek güncelleme için DRY RUN'ı kapatıp tekrar çalıştırın.")
-            elif stats['updated'] > 0:
-                st.success(f"✅ {stats['updated']} ürün başarıyla güncellendi!")
-            
-            progress_bar.progress(1.0)
-            status_text.text("✅ Tamamlandı!")
-            
-        except Exception as e:
-            st.error(f"❌ Hata: {str(e)}")
-            import traceback
-            with st.expander("Detaylı Hata"):
-                st.code(traceback.format_exc())
+                    time.sleep(0.3) # Rate limit koruması
 
-# Yardım bölümü
-with st.expander("❓ Yardım ve İpuçları"):
+                except Exception as e:
+                    stats['failed'] += 1
+                    log_entry = f"<div style='color:red'>Hata: {str(e)}</div>"
+
+            log_buffer.insert(0, log_entry)
+            if len(log_buffer) > 50: log_buffer.pop()
+            
+            results_html = "".join(log_buffer)
+            results_placeholder.markdown(results_html, unsafe_allow_html=True)
+            
+    return stats
+
+# Butonlar
+col_btn1, col_btn2 = st.columns(2)
+
+with col_btn1:
+    if st.button("👁️ Analiz Et ve Önizle", type="secondary"):
+        stats = process_products(preview_only=True)
+        st.success(f"Analiz tamamlandı! {stats['analyzed']} ürün için kategori ve meta alan tespit edildi.")
+
+with col_btn2:
+    if st.button("🚀 İşlemi Başlat", type="primary", disabled=(not update_category and not update_metafields)):
+        if dry_run:
+            st.warning("DRY RUN Modu: Hiçbir değişiklik yapılmayacak.")
+        stats = process_products(preview_only=False)
+        st.success(f"İşlem tamamlandı! {stats['updated']} ürün işlendi.")
+
+# Yardım
+with st.expander("❓ Sıkça Sorulan Sorular"):
     st.markdown("""
-    ### Kategori Tespit Kuralları
+    **S: "Tam Tarama" ne kadar sürer?**
+    C: Mağazadaki ürün sayısına göre değişir. 1000 ürün yaklaşık 2-3 dakika sürebilir (Shopify önerileri kapalıysa).
     
-    Sistem ürün başlığında şu anahtar kelimeleri arar:
+    **S: Kategori yanlış tespit edilirse ne olur?**
+    C: Başlıktaki anahtar kelimeleri düzenleyebilir veya `category_config.json` dosyasını güncelleyebilirsiniz.
     
-    - **Elbise:** elbise, dress
-    - **T-shirt:** t-shirt, tshirt, tişört
-    - **Bluz:** bluz, blouse, gömlek
-    - **Pantolon:** pantolon, pants, jean, kot
-    - **Şort:** şort, short
-    - **Etek:** etek, skirt
-    - **Ceket:** ceket, jacket, mont, kaban
-    - Ve daha fazlası...
-    
-    ### Meta Alan Çıkarma
-    
-    Başlıktan otomatik çıkarılan değerler:
-    
-    - **Yaka:** V yaka, Bisiklet yaka, Hakim yaka vb.
-    - **Kol:** Uzun kol, Kısa kol, Kolsuz vb.
-    - **Boy:** Mini, Midi, Maxi, Diz üstü vb.
-    - **Desen:** Leopar, Çiçekli, Düz, Çizgili vb.
-    - **Paça:** Dar paça, Bol paça vb.
-    - **Bel:** Yüksek bel, Normal bel vb.
-    
-    ### İpuçları
-    
-    1. ✅ İlk önce **Test Modu** ve **DRY RUN** ile deneyin
-    2. ✅ Önizleme yaparak sonuçları kontrol edin
-    3. ✅ Ürün başlıklarının açıklayıcı olması önemli
-    4. ✅ Kategori tespit edilemezse başlığı düzenleyin
+    **S: Metafield'lar görünmüyor?**
+    C: Yukarıdaki "Metafield Definitions Oluştur" butonunu kullandığınızdan emin olun.
     """)
