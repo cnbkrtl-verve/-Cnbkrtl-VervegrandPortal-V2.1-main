@@ -7,6 +7,7 @@ import re
 import json
 from urllib.parse import urljoin, urlparse
 from requests.auth import HTTPBasicAuth
+import concurrent.futures
 
 class SentosAPI:
     """Sentos API ile iletişimi yöneten sınıf."""
@@ -171,6 +172,48 @@ class SentosAPI:
         except Exception as e:
             logging.error(f"Sentos'ta SKU '{sku}' aranırken hata: {e}")
             raise
+
+    def get_products_by_skus_bulk(self, skus: list, max_workers=5, progress_callback=None) -> dict:
+        """
+        ⚡ OPTIMIZATION: Paralel isteklerle birden fazla SKU için ürün verisi çeker.
+        N+1 problemini ThreadPoolExecutor kullanarak çözer.
+
+        Args:
+            skus (list): SKU listesi
+            max_workers (int): Eşzamanlı istek sayısı (varsayılan 5)
+            progress_callback (func): İlerleme durumunu bildiren fonksiyon
+
+        Returns:
+            dict: {sku: product_data}
+        """
+        results = {}
+        unique_skus = list(set([s for s in skus if s]))
+        total_skus = len(unique_skus)
+
+        logging.info(f"⚡ Bulk ürün çekme başlatılıyor: {total_skus} SKU, {max_workers} worker")
+
+        processed_count = 0
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Her SKU için bir future oluştur
+            future_to_sku = {executor.submit(self.get_product_by_sku, sku): sku for sku in unique_skus}
+
+            for future in concurrent.futures.as_completed(future_to_sku):
+                sku = future_to_sku[future]
+                processed_count += 1
+                try:
+                    product = future.result()
+                    if product:
+                        results[sku] = product
+                except Exception as e:
+                    logging.warning(f"Bulk işlem sırasında '{sku}' için hata: {e}")
+
+                # İlerleme güncellemesi
+                if progress_callback:
+                    progress_callback(processed_count, total_skus)
+
+        logging.info(f"⚡ Bulk işlem tamamlandı. {len(results)}/{total_skus} ürün bulundu.")
+        return results
 
     def get_product_by_barcode(self, barcode):
         """Verilen Barkoda göre Sentos'tan tek bir ürün çeker."""
