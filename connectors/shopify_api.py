@@ -26,6 +26,7 @@ class ShopifyAPI:
         }
         self.product_cache = {}
         self.location_id = None
+        self.locations_cache = None  # Caching for get_locations
         
         # ✅ Shopify 2024-10 Rate Limits (daha konservatif)
         # Shopify GraphQL Cost: 1000 points/sec, 50 cost avg/query = ~20 queries/sec max
@@ -538,6 +539,9 @@ class ShopifyAPI:
         return order  
 
     def get_locations(self):
+        if self.locations_cache:
+            return list(self.locations_cache)
+
         query = """
         query {
           locations(first: 25, query:"status:active") {
@@ -550,7 +554,8 @@ class ShopifyAPI:
         try:
             result = self.execute_graphql(query)
             locations_edges = result.get("locations", {}).get("edges", [])
-            return [edge['node'] for edge in locations_edges]
+            self.locations_cache = [edge['node'] for edge in locations_edges]
+            return list(self.locations_cache)
         except Exception as e:
             logging.error(f"Shopify lokasyonları çekilirken hata: {e}")
             return []
