@@ -2,18 +2,15 @@
    🎨 VERVEGRAND PORTAL V2 - ADAPTIVE MODERN DESIGN
    ============================================ */
 
-/* ============== GENEL AYARLAR ============== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-    /* 🎨 Adaptive Color Palette based on Streamlit Theme */
-    /* We use Streamlit's native variables where possible to support Light/Dark switching */
+    /* Base Colors - Synced with Streamlit Theme */
+    --primary-bg: #0e1117;
+    --secondary-bg: #262730;
+    --text-primary: #fafafa;
 
-    --primary-bg: var(--background-color);
-    --secondary-bg: var(--secondary-background-color);
-    --text-primary: var(--text-color);
-
-    /* Accents - Keep these consistent but maybe adjust brightness */
+    /* Accents */
     --accent-primary: #6366f1;
     --accent-secondary: #8b5cf6;
     --accent-success: #10b981;
@@ -21,181 +18,167 @@
     --accent-error: #ef4444;
     --accent-info: #3b82f6;
     
-    /* Dynamic Borders & Shadows */
-    --border-color: rgba(128, 128, 128, 0.2);
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    --card-bg: rgba(255, 255, 255, 0.05); /* Glass effect for dark, subtle for light */
+    /* Borders & Shadows */
+    --border-color: rgba(250, 250, 250, 0.1);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    --card-bg: rgba(38, 39, 48, 0.6);
     
-    /* Spacing */
-    --radius-sm: 8px;
-    --radius-md: 12px;
+    /* Spacing & Radius */
+    --radius-sm: 6px;
+    --radius-md: 10px;
     --radius-lg: 16px;
-    --radius-xl: 20px;
+    --radius-xl: 24px;
 }
 
-/* Light Mode Overrides (Automatic detection if Streamlit is in light mode, text color is usually dark) */
+/* Light Mode Overrides */
 @media (prefers-color-scheme: light) {
     :root {
-        --card-bg: rgba(255, 255, 255, 0.8);
+        --primary-bg: #ffffff;
+        --secondary-bg: #f0f2f6;
+        --text-primary: #31333F;
         --border-color: rgba(0, 0, 0, 0.1);
+        --card-bg: rgba(255, 255, 255, 0.9);
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 }
 
 * {
-    transition: all 0.2s ease-in-out;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--primary-bg);
-    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* ============== HEADER GRADIENT ============== */
+/* ============== HEADERS & TEXT ============== */
+h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* Custom Header Class (Optional, if used manually) */
 .main-header {
-    background: linear-gradient(135deg, 
-        var(--accent-primary) 0%, 
-        var(--accent-secondary) 100%);
-    padding: 2.5rem 2rem;
-    border-radius: var(--radius-xl);
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    padding: 2rem 1.5rem;
+    border-radius: var(--radius-lg);
     color: white;
     text-align: center;
     margin-bottom: 2rem;
-    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
-    position: relative;
-    overflow: hidden;
+    box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.3);
 }
 
 .main-header h1 {
-    font-size: 2.5em;
-    font-weight: 800;
     margin: 0;
-    letter-spacing: -0.5px;
+    font-size: 2rem;
 }
 
-.main-header p {
-    font-size: 1.1em;
-    opacity: 0.9;
-    margin-top: 0.5rem;
-    font-weight: 400;
-}
-
-/* ============== MODERN CARDS (Glassmorphism) ============== */
+/* ============== CARDS & CONTAINERS ============== */
 .status-card {
-    background: var(--secondary-bg);
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
-    margin: 1rem 0;
-    box-shadow: var(--shadow-md);
-    position: relative;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(10px);
 }
 
-.status-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--accent-primary);
-}
+/* ============== STREAMLIT NATIVE COMPONENTS ============== */
 
-/* ============== INPUTS & FORMS ============== */
-/* Make inputs blend better */
-.stTextInput input, .stSelectbox select, .stNumberInput input, .stTextArea textarea {
+/* Inputs */
+.stTextInput input, .stSelectbox div[data-baseweb="select"] > div, .stNumberInput input, .stTextArea textarea {
     background-color: var(--secondary-bg) !important;
     border: 1px solid var(--border-color) !important;
     border-radius: var(--radius-md) !important;
-    padding: 0.5rem 1rem !important;
-    transition: border-color 0.2s !important;
+    color: var(--text-primary) !important;
 }
 
-.stTextInput input:focus, .stSelectbox select:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
+.stTextInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within, .stTextArea textarea:focus {
     border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+    box-shadow: 0 0 0 1px var(--accent-primary) !important;
 }
 
-/* ============== BUTTONS ============== */
+/* Buttons */
 .stButton > button {
     border-radius: var(--radius-md) !important;
-    font-weight: 600 !important;
-    padding: 0.6rem 1.2rem !important;
-    border: none !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: transform 0.1s, box-shadow 0.1s !important;
+    font-weight: 500 !important;
+    border: 1px solid var(--border-color) !important;
+    background-color: var(--secondary-bg) !important;
+    color: var(--text-primary) !important;
 }
 
 .stButton > button:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: var(--shadow-md) !important;
+    border-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
 }
 
-.stButton > button:active {
-    transform: translateY(0) !important;
-}
-
-/* Primary Button Style */
-div[data-testid="stVerticalBlock"] > div > .stButton > button {
-     /* Default Streamlit button is secondary, we rely on 'type="primary"' in python for primary style */
-}
-
-/* Ensure primary buttons use our gradient */
+/* Primary Button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
+    border: none !important;
     color: white !important;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
 }
 
-/* ============== TABLES / DATAFRAMES ============== */
-[data-testid="stDataFrame"] {
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    overflow: hidden;
+.stButton > button[kind="primary"]:hover {
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5) !important;
+    transform: translateY(-1px);
 }
 
-/* ============== PROGRESS BARS ============== */
-.stProgress > div > div > div {
-    background: linear-gradient(90deg, var(--accent-primary), var(--accent-success));
-    border-radius: 10px;
+/* Progress Bars */
+.stProgress > div > div > div > div {
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)) !important;
 }
 
-/* ============== LOG CONTAINER ============== */
-.log-container {
-    background-color: var(--secondary-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
+/* Metric Containers */
+[data-testid="stMetric"] {
+    background-color: var(--card-bg);
     padding: 1rem;
-    font-family: 'Monaco', 'Consolas', monospace;
-    font-size: 0.9em;
-    max-height: 400px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
 }
 
-.log-entry {
-    padding: 4px 0;
-    border-bottom: 1px solid var(--border-color);
+/* Expander/Status */
+.stExpander, [data-testid="stStatusWidget"] {
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+    background-color: var(--card-bg) !important;
 }
-.log-entry:last-child { border-bottom: none; }
-.log-success { color: var(--accent-success); }
-.log-error { color: var(--accent-error); }
-.log-warning { color: var(--accent-warning); }
-.log-info { color: var(--accent-info); }
 
-/* ============== SIDEBAR ============== */
+/* Sidebar */
 [data-testid="stSidebar"] {
     background-color: var(--secondary-bg);
     border-right: 1px solid var(--border-color);
 }
 
-/* ============== RESPONSIVE IMPROVEMENTS ============== */
-@media (max-width: 640px) {
-    .main-header {
-        padding: 1.5rem 1rem;
-    }
-    .main-header h1 {
-        font-size: 1.8em;
-    }
-    .stButton > button {
-        width: 100%;
-    }
+/* Dataframes */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
 }
+
+/* Alerts */
+.stAlert {
+    border-radius: var(--radius-md);
+}
+
+/* ============== CUSTOM LOGGING ============== */
+/* Keeping this for backward compatibility if needed, but modern st.status is preferred */
+.log-container {
+    background-color: #1e1e1e;
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #d4d4d4;
+    border: 1px solid var(--border-color);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.log-success { color: #4ade80; }
+.log-error { color: #f87171; }
+.log-warning { color: #fbbf24; }

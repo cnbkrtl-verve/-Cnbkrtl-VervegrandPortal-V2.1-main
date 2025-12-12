@@ -21,10 +21,12 @@ from config_manager import load_all_user_keys
 from utils.style_loader import load_global_css
 load_global_css()
 
-st.set_page_config(page_title="Shopify Ürün Transferi", layout="wide")
+st.set_page_config(page_title="Shopify Ürün Transferi", layout="wide", page_icon="🔄")
 
 # --- UI Header ---
-st.markdown('<div class="main-header"><h1>🔄 Shopify\'dan Shopify\'a Ürün & Stok Transferi</h1><p>Mağazalar arası hızlı ve güvenli ürün kopyalama aracı</p></div>', unsafe_allow_html=True)
+# Using native Streamlit components for better compatibility with the new theme
+st.title("🔄 Shopify'dan Shopify'a Transfer")
+st.markdown("Mağazalar arası hızlı ve güvenli ürün kopyalama aracı.")
 
 # --- Authentication ---
 if 'authentication_status' not in st.session_state or not st.session_state['authentication_status']:
@@ -34,51 +36,47 @@ if 'authentication_status' not in st.session_state or not st.session_state['auth
 # --- Initialize Session State ---
 if 'pt_source_products' not in st.session_state: st.session_state.pt_source_products = []
 if 'pt_selected_products' not in st.session_state: st.session_state.pt_selected_products = set()
-if 'pt_log' not in st.session_state: st.session_state.pt_log = []
 if 'pt_progress' not in st.session_state: st.session_state.pt_progress = queue.Queue()
 if 'pt_running' not in st.session_state: st.session_state.pt_running = False
+if 'pt_latest_results' not in st.session_state: st.session_state.pt_latest_results = None
 
 # --- API Connection Setup ---
-st.markdown('<div class="status-card"><div class="card-header"><h3>🔌 Mağaza Bağlantı Ayarları</h3></div>', unsafe_allow_html=True)
-col1, col2 = st.columns(2)
+with st.expander("🔌 Mağaza Bağlantı Ayarları", expanded=True):
+    col1, col2 = st.columns(2)
 
-# Load default keys
-user_keys = {}
-try:
-    user_keys = load_all_user_keys(st.session_state.get('username', 'admin'))
-except: pass
+    # Load default keys
+    user_keys = {}
+    try:
+        user_keys = load_all_user_keys(st.session_state.get('username', 'admin'))
+    except: pass
 
-with col1:
-    st.markdown("#### Kaynak Mağaza (Veri Alınacak)")
-    source_store = st.text_input("Mağaza URL", value=user_keys.get('shopify_store', ''), placeholder="shop.myshopify.com", key="src_store")
-    source_token = st.text_input("Access Token", value=user_keys.get('shopify_token', ''), type="password", key="src_token")
+    with col1:
+        st.subheader("Kaynak Mağaza")
+        source_store = st.text_input("Kaynak Mağaza URL", value=user_keys.get('shopify_store', ''), placeholder="shop.myshopify.com", key="src_store")
+        source_token = st.text_input("Kaynak Access Token", value=user_keys.get('shopify_token', ''), type="password", key="src_token")
 
-with col2:
-    st.markdown("#### Hedef Mağaza (Veri Gönderilecek)")
-    dest_store = st.text_input("Mağaza URL", value=user_keys.get('shopify_destination_store', ''), placeholder="dest-shop.myshopify.com", key="dest_store")
-    dest_token = st.text_input("Access Token", value=user_keys.get('shopify_destination_token', ''), type="password", key="dest_token")
+    with col2:
+        st.subheader("Hedef Mağaza")
+        dest_store = st.text_input("Hedef Mağaza URL", value=user_keys.get('shopify_destination_store', ''), placeholder="dest-shop.myshopify.com", key="dest_store")
+        dest_token = st.text_input("Hedef Access Token", value=user_keys.get('shopify_destination_token', ''), type="password", key="dest_token")
 
-st.markdown('</div>', unsafe_allow_html=True) # End status-card
+    if not source_store or not source_token or not dest_store or not dest_token:
+        st.info("ℹ️ İşleme başlamak için bağlantı bilgilerini girin.")
+        st.stop()
 
-if not source_store or not source_token or not dest_store or not dest_token:
-    st.warning("⚠️ Lütfen her iki mağaza için de bağlantı bilgilerini girin.")
-    st.stop()
-
-# Initialize APIs
-try:
-    source_api = ShopifyAPI(source_store, source_token)
-    dest_api = ShopifyAPI(dest_store, dest_token)
-except Exception as e:
-    st.error(f"API başlatma hatası: {e}")
-    st.stop()
+    # Initialize APIs
+    try:
+        source_api = ShopifyAPI(source_store, source_token)
+        dest_api = ShopifyAPI(dest_store, dest_token)
+    except Exception as e:
+        st.error(f"API başlatma hatası: {e}")
+        st.stop()
 
 # --- Tabs ---
 tab1, tab2 = st.tabs(["📋 Manuel Ürün Transferi", "📦 Sadece Stok Eşitleme"])
 
 # === TAB 1: MANUEL TRANSFER ===
 with tab1:
-    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-    st.markdown("### Manuel Ürün Transferi")
     st.info("Kaynak mağazadan ürünleri seçip hedef mağazaya 'Taslak' veya 'Aktif' olarak eksiksiz aktarabilirsiniz.")
 
     # Search & Fetch
@@ -92,82 +90,75 @@ with tab1:
                 result = source_api.get_products_page(limit=50, query=query)
                 st.session_state.pt_source_products = result.get('products', [])
                 st.session_state.pt_selected_products = set() # Reset selection
-
-    st.markdown('</div>', unsafe_allow_html=True)
+                if not st.session_state.pt_source_products:
+                    st.toast("Ürün bulunamadı.", icon="⚠️")
+                else:
+                    st.toast(f"{len(st.session_state.pt_source_products)} ürün bulundu.", icon="✅")
 
     # Product Table
     products = st.session_state.pt_source_products
     if products:
-        st.markdown(f"**{len(products)}** ürün bulundu.")
-
-        # Select All Control
-        c_sel, c_act = st.columns([1, 4])
-        if c_sel.checkbox("Tümünü Seç"):
-            st.session_state.pt_selected_products = {p['id'] for p in products}
-        else:
-            if len(st.session_state.pt_selected_products) == len(products): # Only deselect if all were selected
-                 st.session_state.pt_selected_products = set()
-
-        # Table Header
-        st.markdown("""
-        <div style="display: grid; grid-template-columns: 0.5fr 1fr 3fr 2fr 1fr 1fr; padding: 10px; background: rgba(128,128,128,0.1); border-radius: 8px; font-weight: bold; margin-bottom: 10px;">
-            <div>Seç</div>
-            <div>Resim</div>
-            <div>Ürün Adı</div>
-            <div>SKU</div>
-            <div>Stok</div>
-            <div>Durum</div>
-        </div>
-        """, unsafe_allow_html=True)
-
+        # Prepare data for Data Editor
+        df_data = []
         for p in products:
             is_selected = p['id'] in st.session_state.pt_selected_products
+            img_url = p.get('image', '')
+            df_data.append({
+                "Seç": is_selected,
+                "Resim": img_url,
+                "Ürün Adı": p['title'],
+                "SKU": p['sku'],
+                "Stok": p['inventory'],
+                "Durum": p['status'],
+                "ID": p['id'] # Hidden column for logic
+            })
 
-            # Using columns for rows to allow standard Streamlit widgets (checkbox)
-            cols = st.columns([0.5, 1, 3, 2, 1, 1])
+        df = pd.DataFrame(df_data)
 
-            # Checkbox
-            if cols[0].checkbox("Seç", value=is_selected, key=f"sel_{p['id']}", label_visibility="collapsed"):
-                st.session_state.pt_selected_products.add(p['id'])
-            else:
-                st.session_state.pt_selected_products.discard(p['id'])
+        # Data Editor Configuration
+        edited_df = st.data_editor(
+            df,
+            column_config={
+                "Seç": st.column_config.CheckboxColumn(required=True),
+                "Resim": st.column_config.ImageColumn(help="Ürün ana görseli"),
+                "Ürün Adı": st.column_config.TextColumn(width="large"),
+                "ID": None # Hide ID
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="product_editor"
+        )
 
-            # Image
-            if p.get('image'):
-                cols[1].image(p['image'], width=50)
-            else:
-                cols[1].text("-")
-
-            cols[2].write(p['title'])
-            cols[3].write(p['sku'])
-            cols[4].write(p['inventory'])
-            cols[5].write(p['status'])
-            st.divider()
+        # Sync selection back to session state
+        selected_ids = set(edited_df[edited_df["Seç"]]["ID"].tolist())
+        st.session_state.pt_selected_products = selected_ids
 
         # Action Bar
-        selected_count = len(st.session_state.pt_selected_products)
+        selected_count = len(selected_ids)
+        st.write(f"**{selected_count}** ürün seçildi.")
 
         if selected_count > 0:
-            st.markdown(f"### 🚀 İşlem Başlat ({selected_count} Ürün Seçili)")
-
+            st.divider()
             col_opt, col_go = st.columns([2, 1])
             with col_opt:
                 status_option = st.radio("Hedef Durum", ["Taslak (DRAFT)", "Aktif (ACTIVE)"], horizontal=True)
 
             with col_go:
-                if st.button(f"Transferi Başlat", type="primary", use_container_width=True):
+                if st.button(f"🚀 Transferi Başlat", type="primary", use_container_width=True):
                     status_val = "DRAFT" if "Taslak" in status_option else "ACTIVE"
                     st.session_state.pt_running = True
-                    st.session_state.pt_log = []
+                    st.session_state.pt_latest_results = None
 
                     def run_transfer():
-                        selected_ids = list(st.session_state.pt_selected_products)
-
+                        ids_to_transfer = list(st.session_state.pt_selected_products)
                         def callback(msg):
                             st.session_state.pt_progress.put({'log': msg})
 
-                        results = transfer_products_manual(source_api, dest_api, selected_ids, status_val, callback)
-                        st.session_state.pt_progress.put({'done': True, 'results': results})
+                        try:
+                            results = transfer_products_manual(source_api, dest_api, ids_to_transfer, status_val, callback)
+                            st.session_state.pt_progress.put({'done': True, 'results': results, 'type': 'transfer'})
+                        except Exception as e:
+                            st.session_state.pt_progress.put({'error': str(e)})
 
                     thread = threading.Thread(target=run_transfer)
                     thread.start()
@@ -175,80 +166,79 @@ with tab1:
 
 # === TAB 2: STOCK SYNC ===
 with tab2:
-    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-    st.markdown("### 📦 Stok Eşitleme (SKU Bazlı)")
-    st.warning("⚠️ **DİKKAT:** Bu işlem, Kaynak mağazadaki stok miktarlarını Hedef mağazaya **birebir kopyalar** (SKU eşleşmesi üzerinden). Diğer ürün bilgileri (fiyat, açıklama vs.) değişmez.")
+    st.warning("⚠️ **DİKKAT:** Bu işlem, Kaynak mağazadaki stok miktarlarını Hedef mağazaya **birebir kopyalar** (SKU eşleşmesi üzerinden).")
 
     if st.button("🔄 Stok Eşitlemeyi Başlat", type="primary"):
          st.session_state.pt_running = True
-         st.session_state.pt_log = []
+         st.session_state.pt_latest_results = None
 
          def run_stock_sync():
              def callback(msg):
                  st.session_state.pt_progress.put({'log': msg})
 
-             results = sync_stock_only_shopify_to_shopify(source_api, dest_api, callback)
-             st.session_state.pt_progress.put({'done': True, 'results': results, 'type': 'stock'})
+             try:
+                 results = sync_stock_only_shopify_to_shopify(source_api, dest_api, callback)
+                 st.session_state.pt_progress.put({'done': True, 'results': results, 'type': 'stock'})
+             except Exception as e:
+                 st.session_state.pt_progress.put({'error': str(e)})
 
          thread = threading.Thread(target=run_stock_sync)
          thread.start()
          st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-# === PROGRESS & LOGS ===
+# === PROGRESS & LOGS HANDLING ===
 if st.session_state.pt_running:
-    st.divider()
-    st.subheader("⏳ İşlem Durumu")
+    with st.status("İşlem Sürüyor...", expanded=True) as status:
+        log_placeholder = st.empty()
+        logs = []
 
-    # Custom Log Container
-    log_container = st.empty()
+        while True:
+            try:
+                msg = st.session_state.pt_progress.get(timeout=0.5)
 
-    # Helper to render logs
-    def render_logs(logs):
-        log_html = '<div class="log-container">'
-        for log in logs[-20:]: # Last 20 logs
-            color_class = ""
-            if "✅" in log: color_class = "log-success"
-            elif "❌" in log or "Hata" in log: color_class = "log-error"
-            elif "⚠️" in log: color_class = "log-warning"
+                if 'log' in msg:
+                    logs.append(msg['log'])
+                    # Show last 3 logs in the placeholder for immediate feedback
+                    log_placeholder.markdown("\n".join([f"- {l}" for l in logs[-3:]]))
 
-            log_html += f'<div class="log-entry {color_class}">{log}</div>'
-        log_html += '</div>'
-        return log_html
+                if 'error' in msg:
+                    status.update(label="Hata Oluştu!", state="error", expanded=True)
+                    st.error(msg['error'])
+                    st.session_state.pt_running = False
+                    break
 
-    while True:
-        try:
-            msg = st.session_state.pt_progress.get(timeout=0.1)
+                if 'done' in msg:
+                    status.update(label="İşlem Tamamlandı!", state="complete", expanded=False)
+                    st.session_state.pt_running = False
+                    st.session_state.pt_latest_results = msg
+                    st.rerun()
+                    break
 
-            if 'log' in msg:
-                st.session_state.pt_log.append(msg['log'])
-                log_container.markdown(render_logs(st.session_state.pt_log), unsafe_allow_html=True)
+            except queue.Empty:
+                pass
 
-            if 'done' in msg:
-                st.session_state.pt_running = False
-                results = msg['results']
+# === RESULTS DISPLAY ===
+if st.session_state.pt_latest_results:
+    res = st.session_state.pt_latest_results
 
-                if msg.get('type') == 'stock':
-                    st.success(f"✅ Stok Eşitleme Tamamlandı!")
-                    st.json(results)
-                else:
-                    st.success(f"✅ Transfer Tamamlandı!")
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Başarılı", len(results['success']))
-                    c2.metric("Başarısız", len(results['failed']))
-                    c3.metric("Atlanan", len(results['skipped']))
+    if res.get('type') == 'stock':
+        st.success("✅ Stok Eşitleme Başarılı!")
+        with st.expander("Detaylı Rapor"):
+            st.json(res['results'])
 
-                    if results['failed']:
-                        st.error("Hatalar:")
-                        st.dataframe(pd.DataFrame(results['failed']))
-                break
+    elif res.get('type') == 'transfer':
+        results = res['results']
+        st.success("✅ Transfer İşlemi Tamamlandı!")
 
-        except queue.Empty:
-            # Re-render logs even if no new message to keep UI responsive-ish
-            if st.session_state.pt_log:
-                log_container.markdown(render_logs(st.session_state.pt_log), unsafe_allow_html=True)
-            time.sleep(0.1)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Başarılı", len(results['success']), border=True)
+        c2.metric("Başarısız", len(results['failed']), border=True)
+        c3.metric("Atlanan", len(results['skipped']), border=True)
 
-    if st.button("Kapat ve Yenile"):
-        st.session_state.pt_running = False
-        st.rerun()
+        if results['failed']:
+            st.error("Hatalı Ürünler")
+            st.dataframe(pd.DataFrame(results['failed']))
+
+        if st.button("Sonuçları Temizle"):
+            st.session_state.pt_latest_results = None
+            st.rerun()
