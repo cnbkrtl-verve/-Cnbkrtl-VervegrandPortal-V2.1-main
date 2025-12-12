@@ -29,22 +29,7 @@ try:
     user_keys = load_all_user_keys(st.session_state.get('username', 'admin'))
 except Exception as e:
     st.error(f"⚠️ API bilgileri yüklenirken hata oluştu: {e}")
-    st.info("""
-    **Çözüm Adımları:**
-    
-    1. Projenizin ana dizininde `.streamlit` klasörü oluşturun (eğer yoksa)
-    2. `.streamlit` klasörü içinde `secrets.toml` dosyası oluşturun
-    3. Aşağıdaki bilgileri `secrets.toml` dosyasına ekleyin:
-    
-    ```toml
-    SHOPIFY_STORE = "kaynak-magazaniz.myshopify.com"
-    SHOPIFY_TOKEN = "kaynak-magaza-api-token"
-    SHOPIFY_DESTINATION_STORE = "hedef-magazaniz.myshopify.com"
-    SHOPIFY_DESTINATION_TOKEN = "hedef-magaza-api-token"
-    ```
-    
-    4. Streamlit uygulamasını yeniden başlatın
-    """)
+    st.info("Lütfen uygulama ayarlarını kontrol edin veya yöneticinize başvurun.")
     st.stop()
 
 # --- API Istemcilerini Başlat ---
@@ -53,14 +38,8 @@ try:
     source_store = user_keys.get('shopify_store')
     source_token = user_keys.get('shopify_token')
     if not source_store or not source_token:
-        st.error("❌ Kaynak Shopify mağazası için 'SHOPIFY_STORE' ve 'SHOPIFY_TOKEN' bilgileri secrets dosyasında eksik.")
-        st.info("""
-        **secrets.toml dosyasına şu bilgileri ekleyin:**
-        ```toml
-        SHOPIFY_STORE = "kaynak-magazaniz.myshopify.com"
-        SHOPIFY_TOKEN = "shpat_xxxxxxxxxxxxx"
-        ```
-        """)
+        st.error("❌ Kaynak Shopify mağazası bilgileri (SHOPIFY_STORE, SHOPIFY_TOKEN) eksik.")
+        st.info("Lütfen 'Ayarlar' sayfasından veya secrets yapılandırmasından gerekli tanımlamaları yapınız.")
         st.stop()
     source_api = ShopifyAPI(source_store, source_token)
 
@@ -68,14 +47,8 @@ try:
     dest_store = user_keys.get('shopify_destination_store')
     dest_token = user_keys.get('shopify_destination_token')
     if not dest_store or not dest_token:
-        st.error("❌ Hedef Shopify mağazası için 'SHOPIFY_DESTINATION_STORE' ve 'SHOPIFY_DESTINATION_TOKEN' bilgileri secrets dosyasında eksik.")
-        st.info("""
-        **secrets.toml dosyasına şu bilgileri ekleyin:**
-        ```toml
-        SHOPIFY_DESTINATION_STORE = "hedef-magazaniz.myshopify.com"
-        SHOPIFY_DESTINATION_TOKEN = "shpat_xxxxxxxxxxxxx"
-        ```
-        """)
+        st.error("❌ Hedef Shopify mağazası bilgileri (SHOPIFY_DESTINATION_STORE, SHOPIFY_DESTINATION_TOKEN) eksik.")
+        st.info("Lütfen 'Ayarlar' sayfasından veya secrets yapılandırmasından gerekli tanımlamaları yapınız.")
         st.stop()
     destination_api = ShopifyAPI(dest_store, dest_token)
     
