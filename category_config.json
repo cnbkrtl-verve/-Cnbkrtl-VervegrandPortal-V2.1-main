@@ -10,6 +10,12 @@
           "key": "renk",
           "description": "Renk (Varyantlardan otomatik doldurulur)"
         },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden (S, M, L, 36, 38 vb.)"
+        },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
@@ -39,6 +45,24 @@
           "namespace": "custom",
           "key": "kullanim_alani",
           "description": "Kullanım alanı (Günlük, Gece, Kokteyl vb.)"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş (Pamuklu, Viskon, Polyester vb.)"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet (Kadın, Kız Çocuk vb.)"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu (Yetişkin, Çocuk, Bebek)"
         }
       }
     },
@@ -51,6 +75,12 @@
           "namespace": "custom",
           "key": "renk",
           "description": "Renk (Varyantlardan otomatik doldurulur)"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden (S, M, L vb.)"
         },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
@@ -69,6 +99,24 @@
           "namespace": "custom",
           "key": "desen",
           "description": "Desen (Baskılı, Düz, Çizgili vb.)"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -80,25 +128,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "yaka_tipi",
-          "description": "Yaka tipi (V yaka, Hakim yaka, Gömlek yaka vb.)"
+          "description": "Yaka tipi"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Kısa kol, Uzun kol, 3/4 kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.desen": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "desen",
           "description": "Desen"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -110,25 +182,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "yaka_tipi",
-          "description": "Yaka tipi (Klasik, Hakim, İtalyan vb.)"
+          "description": "Yaka tipi"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.desen": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "desen",
-          "description": "Desen (Düz, Çizgili, Kareli vb.)"
+          "description": "Desen"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -140,25 +236,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.pacha_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "pacha_tipi",
-          "description": "Paça tipi (Dar paça, Bol paça, İspanyol paça vb.)"
+          "description": "Paça tipi"
         },
         "custom.bel_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "bel_tipi",
-          "description": "Bel tipi (Yüksek bel, Normal bel, Düşük bel vb.)"
+          "description": "Bel tipi"
         },
         "custom.boy": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "boy",
-          "description": "Pantolon boyu (Uzun, 7/8, Capri vb.)"
+          "description": "Pantolon boyu"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -170,19 +290,43 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.boy": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "boy",
-          "description": "Şort boyu (Mini, Midi, Bermuda vb.)"
+          "description": "Şort boyu"
         },
         "custom.bel_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "bel_tipi",
-          "description": "Bel tipi (Yüksek bel, Normal bel vb.)"
+          "description": "Bel tipi"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -194,19 +338,43 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.boy": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "boy",
-          "description": "Etek boyu (Mini, Midi, Maxi vb.)"
+          "description": "Etek boyu"
         },
         "custom.model": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "model",
-          "description": "Model (Kalem, Pileli, A kesim vb.)"
+          "description": "Model"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -218,19 +386,43 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.kapanma_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kapanma_tipi",
-          "description": "Kapanma tipi (Fermuarlı, Düğmeli, Çıtçıtlı vb.)"
+          "description": "Kapanma tipi"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -242,31 +434,55 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.kapanma_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kapanma_tipi",
-          "description": "Kapanma tipi (Fermuarlı, Düğmeli, Çıtçıtlı vb.)"
+          "description": "Kapanma tipi"
         },
         "custom.boy": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "boy",
-          "description": "Mont boyu (Kısa, Orta, Uzun vb.)"
+          "description": "Mont boyu"
         },
         "custom.kapusonlu": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kapusonlu",
-          "description": "Kapüşon durumu (Kapüşonlu, Kapüşonsuz)"
+          "description": "Kapüşon durumu"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -278,25 +494,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol, Kolsuz vb.)"
+          "description": "Kol tipi"
         },
         "custom.kapanma_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kapanma_tipi",
-          "description": "Kapanma tipi (Düğmeli, Açık, Fermuarlı vb.)"
+          "description": "Kapanma tipi"
         },
         "custom.boy": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "boy",
-          "description": "Hırka boyu (Kısa, Orta, Uzun vb.)"
+          "description": "Hırka boyu"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -308,25 +548,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.kapusonlu": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kapusonlu",
-          "description": "Kapüşon durumu (Kapüşonlu, Kapüşonsuz)"
+          "description": "Kapüşon durumu"
         },
         "custom.desen": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "desen",
-          "description": "Desen (Baskılı, Düz, Logolu vb.)"
+          "description": "Desen"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -338,25 +602,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "yaka_tipi",
-          "description": "Yaka tipi (Boğazlı, V yaka, Bisiklet yaka, Balıkçı vb.)"
+          "description": "Yaka tipi"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.desen": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "desen",
-          "description": "Desen (Düz, Örgü, Desenli vb.)"
+          "description": "Desen"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -368,19 +656,43 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "yaka_tipi",
-          "description": "Yaka tipi (Boğazlı, V yaka, Bisiklet yaka vb.)"
+          "description": "Yaka tipi"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol vb.)"
+          "description": "Kol tipi"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     },
@@ -392,25 +704,49 @@
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "renk",
-          "description": "Renk (Varyantlardan otomatik doldurulur)"
+          "description": "Renk"
+        },
+        "custom.beden": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "beden",
+          "description": "Beden"
         },
         "custom.yaka_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "yaka_tipi",
-          "description": "Yaka tipi (V yaka, Hakim yaka, Bisiklet yaka vb.)"
+          "description": "Yaka tipi"
         },
         "custom.kol_tipi": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "kol_tipi",
-          "description": "Kol tipi (Uzun kol, Kısa kol vb.)"
+          "description": "Kol tipi"
         },
         "custom.boy": {
           "type": "single_line_text_field",
           "namespace": "custom",
           "key": "boy",
-          "description": "Tunik boyu (Kısa, Orta, Uzun vb.)"
+          "description": "Tunik boyu"
+        },
+        "custom.kumas": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "kumas",
+          "description": "Kumaş"
+        },
+        "custom.hedef_cinsiyet": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "hedef_cinsiyet",
+          "description": "Hedef Cinsiyet"
+        },
+        "custom.yas_grubu": {
+          "type": "single_line_text_field",
+          "namespace": "custom",
+          "key": "yas_grubu",
+          "description": "Yaş Grubu"
         }
       }
     }
@@ -435,7 +771,9 @@
       ["kare\\s*yaka", "Kare Yaka"],
       ["askılı", "Askılı"],
       ["straplez", "Straplez"],
-      ["tek\\s*omuz", "Tek Omuz"]
+      ["tek\\s*omuz", "Tek Omuz"],
+      ["kruvaze", "Kruvaze Yaka"],
+      ["bebe\\s*yaka", "Bebe Yaka"]
     ],
     "kol_tipi": [
       ["uzun\\s*kol", "Uzun Kol"],
@@ -446,7 +784,8 @@
       ["balon\\s*kol", "Balon Kol"],
       ["fırfırlı\\s*kol", "Fırfırlı Kol"],
       ["volan\\s*kol", "Volan Kol"],
-      ["düşük\\s*omuz", "Düşük Omuz"]
+      ["düşük\\s*omuz", "Düşük Omuz"],
+      ["reglan\\s*kol", "Reglan Kol"]
     ],
     "boy": [
       ["maxi\\s*boy", "Maxi"],
@@ -483,7 +822,9 @@
       ["örgü", "Örgü"],
       ["jakarlı", "Jakarlı"],
       ["geometrik", "Geometrik"],
-      ["soyut", "Soyut"]
+      ["soyut", "Soyut"],
+      ["kazayağı", "Kazayağı"],
+      ["ekose", "Ekose"]
     ],
     "pacha_tipi": [
       ["dar\\s*paça", "Dar Paça"],
@@ -492,7 +833,8 @@
       ["düz\\s*paça", "Düz Paça"],
       ["lastikli\\s*paça", "Lastikli Paça"],
       ["wide\\s*leg", "Bol Paça"],
-      ["skinny", "Dar Paça"]
+      ["skinny", "Dar Paça"],
+      ["boru\\s*paça", "Boru Paça"]
     ],
     "bel_tipi": [
       ["yüksek\\s*bel", "Yüksek Bel"],
@@ -510,7 +852,8 @@
       ["çıtçıtlı", "Çıtçıtlı"],
       ["çıtçıt", "Çıtçıtlı"],
       ["açık\\s*model", "Açık"],
-      ["önden\\s*açık", "Önden Açık"]
+      ["önden\\s*açık", "Önden Açık"],
+      ["bağcıklı", "Bağcıklı"]
     ],
     "kapusonlu": [
       ["kapüşonlu", "Kapüşonlu"],
@@ -526,11 +869,14 @@
       ["ofis", "Ofis"],
       ["iş", "İş"],
       ["düğün", "Düğün"],
-      ["özel\\s*gün", "Özel Gün"]
+      ["özel\\s*gün", "Özel Gün"],
+      ["plaj", "Plaj"],
+      ["davet", "Davet"]
     ],
     "cep": [
       ["cepli", "Cepli"],
-      ["cepsiz", "Cepsiz"]
+      ["cepsiz", "Cepsiz"],
+      ["kanguru\\s*cep", "Kanguru Cep"]
     ],
     "model": [
       ["kalem\\s*etek", "Kalem"],
@@ -539,9 +885,10 @@
       ["a\\s*kesim", "A Kesim"],
       ["balon", "Balon"],
       ["saten", "Saten"],
-      ["volanlı", "Volanlı"]
+      ["volanlı", "Volanlı"],
+      ["kloş", "Kloş"]
     ],
-    "kumaş": [
+    "kumas": [
       ["pamuklu", "Pamuklu"],
       ["pamuk", "Pamuklu"],
       ["viskon", "Viskon"],
@@ -557,7 +904,12 @@
       ["örme", "Örme"],
       ["dokuma", "Dokuma"],
       ["şifon", "Şifon"],
-      ["krep", "Krep"]
+      ["krep", "Krep"],
+      ["keten", "Keten"],
+      ["deri", "Deri"],
+      ["süet", "Süet"],
+      ["yunlu", "Yünlü"],
+      ["yün", "Yünlü"]
     ],
     "stil": [
       ["oversize", "Oversize"],
@@ -568,7 +920,22 @@
       ["boyfriend", "Boyfriend"],
       ["mom", "Mom"],
       ["vintage", "Vintage"],
-      ["retro", "Retro"]
+      ["retro", "Retro"],
+      ["salaş", "Salaş"]
+    ],
+    "hedef_cinsiyet": [
+      ["kadın", "Kadın"],
+      ["bayan", "Kadın"],
+      ["kız\\s*çocuk", "Kız Çocuk"],
+      ["erkek\\s*çocuk", "Erkek Çocuk"],
+      ["erkek", "Erkek"],
+      ["unisex", "Unisex"]
+    ],
+    "yas_grubu": [
+      ["yetişkin", "Yetişkin"],
+      ["çocuk", "Çocuk"],
+      ["bebek", "Bebek"],
+      ["genç", "Yetişkin"]
     ]
   }
 }
