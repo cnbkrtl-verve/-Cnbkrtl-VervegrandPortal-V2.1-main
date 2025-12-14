@@ -14,6 +14,7 @@ import time
 # Gerekli modülleri import ediyoruz
 from config_manager import load_all_user_keys
 from data_manager import load_user_data
+import utils.ux  # Import UX extensions (patches st.badge)
 # YENİ: Import ifadeleri yeni modüler yapıya göre güncellendi.
 from connectors.shopify_api import ShopifyAPI
 from connectors.sentos_api import SentosAPI
