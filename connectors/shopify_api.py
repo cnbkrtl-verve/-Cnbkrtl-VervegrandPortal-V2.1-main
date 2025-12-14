@@ -688,7 +688,9 @@ class ShopifyAPI:
 
     def get_variant_ids_by_skus(self, skus: list, search_by_product_sku=False) -> dict:
         """
-        RATE LIMIT KORUMASIZ GELIŞTIRILMIŞ VERSİYON
+        ⚡ OPTIMIZED: Fetches variant IDs by SKUs using 'productVariants' query instead of 'products'.
+        Significantly reduces query cost (from ~500 to ~50 points per batch).
+        Increases batch size from 2 to 50 and reduces wait time.
         """
         if not skus: return {}
         sanitized_skus = [str(sku).strip() for sku in skus if sku]
@@ -697,26 +699,29 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # ⚡ OPTIMIZATION: Increased batch size from 2 to 50
+        batch_size = 50
+
+        # Calculate total batches for progress logging
+        total_batches = (len(sanitized_skus) + batch_size - 1) // batch_size
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
+            current_batch = i // batch_size + 1
             
+            # ⚡ OPTIMIZATION: Use 'productVariants' query directly
+            # This query costs significantly less than nested products query
+            # Cost: 1 + 50 (edges) = 51 points vs ~500+ points for products query
             query = """
-            query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+            query getVariantsBySku($query: String!) {
+              productVariants(first: 50, query: $query) {
                 edges {
                   node {
                     id
-                    variants(first: 50) {
-                      edges {
-                        node { 
-                          id
-                          sku 
-                        }
-                      }
+                    sku
+                    product {
+                      id
                     }
                   }
                 }
@@ -725,30 +730,36 @@ class ShopifyAPI:
             """
 
             try:
-                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
+                logging.info(f"SKU batch {current_batch}/{total_batches} işleniyor: {len(sku_chunk)} SKUs")
                 result = self.execute_graphql(query, {"query": query_filter})
-                product_edges = result.get("products", {}).get("edges", [])
-                for p_edge in product_edges:
-                    product_node = p_edge.get("node", {})
-                    product_id = product_node.get("id")
-                    variant_edges = product_node.get("variants", {}).get("edges", [])
-                    for v_edge in variant_edges:
-                        node = v_edge.get("node", {})
-                        if node.get("sku") and node.get("id") and product_id:
-                            sku_map[node["sku"]] = {
-                                "variant_id": node["id"],
-                                "product_id": product_id
-                            }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
+                variant_edges = result.get("productVariants", {}).get("edges", [])
+
+                for v_edge in variant_edges:
+                    node = v_edge.get("node", {})
+                    sku = node.get("sku")
+                    variant_id = node.get("id")
+                    product_id = node.get("product", {}).get("id")
+
+                    if sku and variant_id and product_id:
+                        sku_map[sku] = {
+                            "variant_id": variant_id,
+                            "product_id": product_id
+                        }
+
+                # ⚡ OPTIMIZATION: Reduced sleep time from 3s to 0.5s
+                # Since query cost is low (~51 points), we can execute ~20 queries/sec with 1000 points budget
+                # 0.5s sleep is very safe.
                 if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                    # logging.info(f"Batch {current_batch} tamamlandı, kısa bekleme...")
+                    time.sleep(0.5)
             
             except Exception as e:
-                logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
-                # Hata durumunda da biraz bekle
-                time.sleep(5)
+                logging.error(f"SKU grubu {current_batch} için varyant ID'leri alınırken hata: {e}")
+                time.sleep(2)
+                # Don't raise immediately to process other batches if possible,
+                # but original code raised, so we might want to be careful.
+                # Keeping original behavior of raising to stop if API is broken.
                 raise e
 
         logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
