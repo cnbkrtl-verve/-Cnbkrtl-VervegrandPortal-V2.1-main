@@ -17,6 +17,9 @@ if project_root not in sys.path:
 from utils.style_loader import load_global_css
 load_global_css()
 
+# UI Bileşenlerini Yükle (Badge vb. için)
+import utils_ui
+
 # ---------------------------------------------------------------------
 
 from connectors.shopify_api import ShopifyAPI
@@ -227,9 +230,9 @@ if 'shopify_orders_display' in st.session_state:
                     with cols[1]:
                         st.write(f"**{total:.2f} {currency}**")
                     with cols[2]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{financial_status}</span>", unsafe_allow_html=True)
+                        st.badge(financial_status, color=status_colors.get(financial_status, 'gray'))
                     with cols[3]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{fulfillment_status}</span>", unsafe_allow_html=True)
+                        st.badge(fulfillment_status, color=status_colors.get(fulfillment_status, 'gray'))
                     with cols[4]:
                         # Güvenli tarih formatı
                         created_at = order.get('createdAt', '')
@@ -274,11 +277,11 @@ if 'shopify_orders_display' in st.session_state:
                     # Ana bilgiler
                     info_cols = st.columns([2, 1])
                     with info_cols[0]:
-                        st.markdown(f"""
-                        **📅 Sipariş Tarihi:** {date_display}  
-                        **💳 Ödeme Durumu:** <span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{financial_status}</span>  
-                        **📦 Kargo Durumu:** <span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{fulfillment_status}</span>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f"**📅 Sipariş Tarihi:** {date_display}")
+                        st.write("**💳 Ödeme Durumu:**")
+                        st.badge(financial_status, color=status_colors.get(financial_status, 'gray'))
+                        st.write("**📦 Kargo Durumu:**")
+                        st.badge(fulfillment_status, color=status_colors.get(fulfillment_status, 'gray'))
                         
                         # Sipariş kimliği ve kaynağı
                         st.markdown(f"**🆔 Sipariş ID:** `{order.get('id', 'N/A')}`")
