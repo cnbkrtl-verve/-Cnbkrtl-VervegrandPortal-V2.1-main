@@ -182,3 +182,36 @@ h1, h2, h3 {
 .log-success { color: #4ade80; }
 .log-error { color: #f87171; }
 .log-warning { color: #fbbf24; }
+
+/* ============================================
+   BADGE COMPONENT (Added by Palette)
+   ============================================ */
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+}
+
+.badge-success {
+    background-color: #e3f5ee;
+    color: #004c3f;
+}
+
+.badge-warning {
+    background-color: #fff8e1;
+    color: #5c4813;
+}
+
+.badge-error {
+    background-color: #fef5f1;
+    color: #8b1e0c;
+}
+
+.badge-info {
+    background-color: #e8f5fa;
+    color: #1e4e79;
+}

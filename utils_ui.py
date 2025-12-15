@@ -607,6 +607,53 @@ def show_shopify_toast(message: str, is_error: bool = False):
     st.components.v1.html(toast_js, height=0)
 
 
+def badge(text, icon=None, color="gray"):
+    """
+    Renders a badge component and monkey-patches it to Streamlit.
+    Handles custom colors by falling back to inline styles.
+    """
+    color_map = {
+        "green": "badge-success",
+        "success": "badge-success",
+        "paid": "badge-success",
+        "yellow": "badge-warning",
+        "warning": "badge-warning",
+        "pending": "badge-warning",
+        "red": "badge-error",
+        "error": "badge-error",
+        "blue": "badge-info",
+        "info": "badge-info",
+        "gray": "badge-info",
+        "grey": "badge-info",
+    }
+
+    color_lower = color.lower()
+    css_class = color_map.get(color_lower)
+
+    if css_class:
+        # Mapped class
+        style_attr = ""
+    else:
+        # Custom color - fallback to inline style
+        # We try to use the color as background, and text white or black based on brightness?
+        # For simplicity, if it's not mapped, we assume it's a valid CSS color string
+        # and set it as background with white text (safe default for badges)
+        css_class = "badge" # base class
+        style_attr = f'style="background-color: {color}; color: white;"'
+
+    icon_html = f'<span style="margin-right:4px">{icon}</span>' if icon else ''
+
+    if style_attr:
+        html = f'<span class="{css_class}" {style_attr}>{icon_html}{text}</span>'
+    else:
+        html = f'<span class="badge {css_class}">{icon_html}{text}</span>'
+
+    st.markdown(html, unsafe_allow_html=True)
+
+# Monkey-patch Streamlit
+st.badge = badge
+
+
 # Example usage in a Streamlit page
 if __name__ == "__main__":
     # This is how you would use it in your pages
@@ -631,3 +678,7 @@ if __name__ == "__main__":
     
     if st.button("Show Toast Notification"):
         show_shopify_toast("This is a test notification!")
+
+    st.markdown("### Badges")
+    st.badge("Success Badge", icon="✅", color="success")
+    st.badge("Warning Badge", icon="⚠️", color="warning")
