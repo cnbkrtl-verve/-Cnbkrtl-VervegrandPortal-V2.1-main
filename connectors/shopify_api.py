@@ -688,35 +688,35 @@ class ShopifyAPI:
 
     def get_variant_ids_by_skus(self, skus: list, search_by_product_sku=False) -> dict:
         """
-        RATE LIMIT KORUMASIZ GELIŞTIRILMIŞ VERSİYON
+        ⚡ OPTIMIZATION: productVariants kök sorgusu ile optimize edilmiş SKU arama.
+        Eski yöntem (products sorgusu + döngü) yerine doğrudan varyantları çeker.
+        Batch boyutu 2'den 50'ye çıkarıldı ve gereksiz sleep kaldırıldı.
         """
         if not skus: return {}
         sanitized_skus = [str(sku).strip() for sku in skus if sku]
         if not sanitized_skus: return {}
         
-        logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
+        logging.info(f"⚡ {len(sanitized_skus)} adet SKU için optimize edilmiş varyant ID araması başlatılıyor...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # Batch boyutunu 50'ye çıkar (Shopify için güvenli sınır)
+        batch_size = 50
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
+            # SKU'ları OR ile birleştir
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # productVariants kök sorgusu kullan (Daha hızlı ve doğrudan)
             query = """
-            query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+            query getVariantIds($query: String!) {
+              productVariants(first: 100, query: $query) {
                 edges {
                   node {
                     id
-                    variants(first: 50) {
-                      edges {
-                        node { 
-                          id
-                          sku 
-                        }
-                      }
+                    sku
+                    product {
+                      id
                     }
                   }
                 }
@@ -725,33 +725,30 @@ class ShopifyAPI:
             """
 
             try:
-                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
+                logging.debug(f"SKU batch işleniyor: {sku_chunk[:5]}...")
                 result = self.execute_graphql(query, {"query": query_filter})
-                product_edges = result.get("products", {}).get("edges", [])
-                for p_edge in product_edges:
-                    product_node = p_edge.get("node", {})
-                    product_id = product_node.get("id")
-                    variant_edges = product_node.get("variants", {}).get("edges", [])
-                    for v_edge in variant_edges:
-                        node = v_edge.get("node", {})
-                        if node.get("sku") and node.get("id") and product_id:
-                            sku_map[node["sku"]] = {
-                                "variant_id": node["id"],
-                                "product_id": product_id
-                            }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                variant_edges = result.get("productVariants", {}).get("edges", [])
+
+                for v_edge in variant_edges:
+                    node = v_edge.get("node", {})
+                    sku = node.get("sku")
+                    variant_id = node.get("id")
+                    product_id = node.get("product", {}).get("id")
+
+                    if sku and variant_id and product_id:
+                        sku_map[sku] = {
+                            "variant_id": variant_id,
+                            "product_id": product_id
+                        }
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
-                # Hata durumunda da biraz bekle
-                time.sleep(5)
+                # Hata durumunda biraz bekle ve hatayı fırlat (çağıran yer bilsin)
+                time.sleep(1)
                 raise e
 
-        logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
+        logging.info(f"✅ Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
         return sku_map
 
     def get_product_media_details(self, product_gid):
