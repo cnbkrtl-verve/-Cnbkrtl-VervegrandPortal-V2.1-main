@@ -39,6 +39,7 @@ class CategoryMetafieldManager:
     """
     
     _config = None
+    _compiled_patterns = None
     
     @classmethod
     def _load_config(cls):
@@ -55,10 +56,33 @@ class CategoryMetafieldManager:
 
                 with open(config_path, 'r', encoding='utf-8') as f:
                     cls._config = json.load(f)
+
+                # Regex'leri derle
+                cls._compile_patterns()
+
             except Exception as e:
                 logging.error(f"Konfigürasyon dosyası yüklenemedi: {e}")
                 cls._config = {"categories": {}, "patterns": {}}
+                cls._compiled_patterns = {}
         return cls._config
+
+    @classmethod
+    def _compile_patterns(cls):
+        """Pattern'leri bir kere derleyip cache'e atar"""
+        cls._compiled_patterns = {}
+        raw_patterns = cls._config.get('patterns', {})
+
+        for field, pattern_list in raw_patterns.items():
+            compiled_list = []
+            for pattern_str, value in pattern_list:
+                try:
+                    # Case insensitive derle
+                    compiled = re.compile(pattern_str, re.IGNORECASE)
+                    compiled_list.append((compiled, value))
+                except re.error as e:
+                    logging.error(f"Regex derleme hatası ({pattern_str}): {e}")
+
+            cls._compiled_patterns[field] = compiled_list
 
     @classmethod
     def get_category_keywords(cls):
@@ -151,13 +175,15 @@ class CategoryMetafieldManager:
         4. Ürün Başlığı (Regex)
         5. Ürün Açıklaması (Regex)
         """
-        values = {}
-        title_lower = product_title.lower()
-        desc_lower = product_description.lower() if product_description else ""
-        tags_lower = [t.lower() for t in tags] if tags else []
+        # Config ve compiled patterns yüklendiğinden emin ol
+        CategoryMetafieldManager._load_config()
         
-        config = CategoryMetafieldManager._load_config()
-        patterns = config.get('patterns', {})
+        values = {}
+        # Regex için lower case yapmaya gerek yok çünkü patternler IGNORECASE ile derlendi
+        # Ancak basit contains kontrolleri için tutabiliriz
+        title_raw = product_title
+        desc_raw = product_description if product_description else ""
+        tags_raw = tags if tags else []
         
         # ============================================
         # 1. SHOPIFY ÖNERİLERİ
@@ -193,6 +219,9 @@ class CategoryMetafieldManager:
             if sizes and 'beden' not in values:
                 values['beden'] = ', '.join(sorted(list(sizes)))
 
+        # Pre-compiled regex patterns kullan
+        patterns = CategoryMetafieldManager._compiled_patterns
+
         # ============================================
         # 3. TAGS & PRODUCT TYPE
         # ============================================
@@ -201,9 +230,9 @@ class CategoryMetafieldManager:
             if field in values: continue
 
             # Tags içinde ara
-            for tag in tags_lower:
-                for pattern, value in pattern_list:
-                    if re.search(pattern, tag):
+            for tag in tags_raw:
+                for compiled_pattern, value in pattern_list:
+                    if compiled_pattern.search(tag):
                         values[field] = value
                         break
                 if field in values: break
@@ -213,19 +242,19 @@ class CategoryMetafieldManager:
         # ============================================
         for field, pattern_list in patterns.items():
             if field not in values:
-                for pattern, value in pattern_list:
-                    if re.search(pattern, title_lower):
+                for compiled_pattern, value in pattern_list:
+                    if compiled_pattern.search(title_raw):
                         values[field] = value
                         break
         
         # ============================================
         # 5. AÇIKLAMADAN REGEX
         # ============================================
-        if desc_lower:
+        if desc_raw:
             for field, pattern_list in patterns.items():
                 if field not in values:
-                    for pattern, value in pattern_list:
-                        if re.search(pattern, desc_lower):
+                    for compiled_pattern, value in pattern_list:
+                        if compiled_pattern.search(desc_raw):
                             values[field] = value
                             break
         
