@@ -115,6 +115,12 @@ h1, h2, h3 {
     color: var(--accent-primary) !important;
 }
 
+.stButton > button:focus-visible {
+    outline: 2px solid var(--accent-primary) !important;
+    outline-offset: 2px !important;
+    border-color: var(--accent-primary) !important;
+}
+
 /* Primary Button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
@@ -163,6 +169,13 @@ h1, h2, h3 {
 /* Alerts */
 .stAlert {
     border-radius: var(--radius-md);
+}
+
+/* Accessibility Focus Ring for Links */
+a:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 
 /* ============== CUSTOM LOGGING ============== */

@@ -139,7 +139,7 @@ def inject_shopify_style():
         box-shadow: inset 0 1px 0 0 rgba(0, 0, 0, 0.15) !important;
     }
     
-    .stButton > button:focus {
+    .stButton > button:focus, .stButton > button:focus-visible {
         outline: 2px solid var(--shopify-interactive) !important;
         outline-offset: 2px !important;
     }
