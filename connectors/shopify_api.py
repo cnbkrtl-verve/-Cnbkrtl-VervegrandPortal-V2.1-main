@@ -14,7 +14,12 @@ class ShopifyAPI:
         if not store_url: raise ValueError("Shopify Mağaza URL'si boş olamaz.")
         if not access_token: raise ValueError("Shopify Erişim Token'ı boş olamaz.")
         
-        self.store_url = store_url if store_url.startswith('http') else f"https://{store_url.strip()}"
+        cleaned_url = store_url.strip()
+        if cleaned_url.startswith('http://'):
+             cleaned_url = 'https://' + cleaned_url[7:]
+        elif not cleaned_url.startswith('https://'):
+             cleaned_url = f"https://{cleaned_url}"
+        self.store_url = cleaned_url
         self.access_token = access_token
         self.api_version = api_version # Gelen versiyonu kullan
         self.graphql_url = f"{self.store_url}/admin/api/{self.api_version}/graphql.json" # URL'yi dinamik hale getir
@@ -38,6 +43,7 @@ class ShopifyAPI:
         self.max_requests_per_minute = 30  # 40'tan 30'a düşürüldü
         self.burst_tokens = 5  # 10'dan 5'e düşürüldü (burst koruması)
         self.current_tokens = 5  # Başlangıç token sayısı da 5
+        self.BATCH_SIZE = 50
 
     def _rate_limit_wait(self):
         """
@@ -688,7 +694,8 @@ class ShopifyAPI:
 
     def get_variant_ids_by_skus(self, skus: list, search_by_product_sku=False) -> dict:
         """
-        RATE LIMIT KORUMASIZ GELIŞTIRILMIŞ VERSİYON
+        SKU listesinden varyant ID'lerini bulur.
+        Optimize edilmiş versiyon: Batch size artırıldı ve gereksiz bekleme kaldırıldı.
         """
         if not skus: return {}
         sanitized_skus = [str(sku).strip() for sku in skus if sku]
@@ -697,16 +704,19 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # Optimize edilmiş batch boyutu (execute_graphql rate limit'i yönetir)
+        batch_size = self.BATCH_SIZE
         
+        total_batches = (len(sanitized_skus) + batch_size - 1) // batch_size
+
         for i in range(0, len(sanitized_skus), batch_size):
+            current_batch_num = (i // batch_size) + 1
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 50, query: $query) {
                 edges {
                   node {
                     id
@@ -725,7 +735,7 @@ class ShopifyAPI:
             """
 
             try:
-                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
+                logging.info(f"SKU batch {current_batch_num}/{total_batches} işleniyor ({len(sku_chunk)} SKU)")
                 result = self.execute_graphql(query, {"query": query_filter})
                 product_edges = result.get("products", {}).get("edges", [])
                 for p_edge in product_edges:
@@ -740,15 +750,10 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
-            
             except Exception as e:
-                logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
-                # Hata durumunda da biraz bekle
-                time.sleep(5)
+                logging.error(f"SKU grubu {current_batch_num} için varyant ID'leri alınırken hata: {e}")
+                # Hata durumunda kısa bekle
+                time.sleep(1)
                 raise e
 
         logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
