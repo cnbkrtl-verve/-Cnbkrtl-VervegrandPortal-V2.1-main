@@ -182,3 +182,37 @@ h1, h2, h3 {
 .log-success { color: #4ade80; }
 .log-error { color: #f87171; }
 .log-warning { color: #fbbf24; }
+
+/* New Log Entry Styles */
+.log-entry {
+    padding: 8px;
+    margin: 4px 0;
+    border-left: 3px solid transparent;
+    border-radius: 4px;
+    font-size: 0.9em;
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+}
+
+.log-entry-info {
+    border-color: var(--accent-info);
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.log-entry-success {
+    border-color: var(--accent-success);
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.log-entry-error {
+    border-color: var(--accent-error);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.log-entry-warning {
+    border-color: var(--accent-warning);
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.log-highlight-blue { color: var(--accent-info); font-weight: 500; }
+.log-highlight-green { color: var(--accent-success); font-weight: 500; }

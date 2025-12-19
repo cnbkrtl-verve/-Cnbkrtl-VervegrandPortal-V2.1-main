@@ -4,6 +4,7 @@ Injects custom CSS to make Streamlit look like a native Shopify app
 """
 
 import streamlit as st
+import html
 
 
 def inject_shopify_style():
@@ -631,3 +632,52 @@ if __name__ == "__main__":
     
     if st.button("Show Toast Notification"):
         show_shopify_toast("This is a test notification!")
+
+def get_log_entry_html(title: str, category: str = "", details: str = "", status: str = "info") -> str:
+    """
+    Generates an HTML string for a log entry with theme-aware styling.
+
+    Args:
+        title: Main message/title of the log
+        category: Category string (e.g., 'T-Shirt')
+        details: Additional details (e.g., metafields or error message)
+        status: 'info', 'success', 'error', or 'warning'
+
+    Returns:
+        HTML string to be used with st.markdown(..., unsafe_allow_html=True)
+    """
+
+    css_class = f"log-entry log-entry-{status}"
+
+    icon = "ℹ️"
+    if status == "success": icon = "✅"
+    elif status == "error": icon = "❌"
+    elif status == "warning": icon = "⚠️"
+
+    # Escape HTML special characters in content to prevent injection/breaking
+    title = html.escape(title)
+    category = html.escape(str(category)) if category else ""
+    details = html.escape(str(details)) if details else ""
+
+    content = f"<b>{icon} {title}</b>"
+
+    if category or details:
+        content += "<br>"
+        if category:
+            content += f"<span class='log-highlight-blue'>📂 {category}</span>"
+
+        if category and details:
+            content += " | "
+
+        if details:
+             # If it's an error, make details red, else green/neutral
+            detail_class = "log-highlight-green" if status == "success" else ""
+            if status == "error": detail_class = "log-error"
+
+            content += f"<span class='{detail_class}'>{details}</span>"
+
+    return f"""
+    <div class="{css_class}">
+        {content}
+    </div>
+    """
