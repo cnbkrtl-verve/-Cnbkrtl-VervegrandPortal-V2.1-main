@@ -697,16 +697,18 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # OPTIMIZATION: Increased batch size to 50 and removed hard sleep
+        # The class's built-in _rate_limit_wait handles throttling
+        batch_size = 50
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # Increased 'first' to match batch size to ensure all results are returned
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 50, query: $query) {
                 edges {
                   node {
                     id
@@ -725,7 +727,7 @@ class ShopifyAPI:
             """
 
             try:
-                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
+                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor ({len(sku_chunk)} SKUs)")
                 result = self.execute_graphql(query, {"query": query_filter})
                 product_edges = result.get("products", {}).get("edges", [])
                 for p_edge in product_edges:
@@ -740,10 +742,7 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # Removed hard sleep. _rate_limit_wait in execute_graphql/make_request handles it.
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
