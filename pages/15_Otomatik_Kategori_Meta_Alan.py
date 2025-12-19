@@ -22,6 +22,8 @@ if project_root not in sys.path:
 from utils.style_loader import load_global_css
 load_global_css()
 
+# Import new UI utility
+from utils_ui import get_log_entry_html
 
 # Import işlemleri
 try:
@@ -297,12 +299,12 @@ def process_products(preview_only=True):
             log_entry = ""
             if preview_only or dry_run:
                 stats['updated'] += 1 # Teorik olarak güncellenecek
-                log_entry = f"""
-                <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #2196f3; background: #e3f2fd; font-family: monospace; font-size: 0.9em;'>
-                    <b>{title[:50]}</b><br>
-                    <span style='color: #1565c0'>📂 {category}</span> | <span style='color: #00695c'>🏷️ {metafield_str}</span>
-                </div>
-                """
+                log_entry = get_log_entry_html(
+                    title=title[:50],
+                    category=category,
+                    details=metafield_str,
+                    status="info"
+                )
             else:
                 # GERÇEK GÜNCELLEME
                 try:
@@ -316,24 +318,30 @@ def process_products(preview_only=True):
                     
                     if result.get('success'):
                         stats['updated'] += 1
-                        log_entry = f"""
-                        <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #4caf50; background: #e8f5e9; font-size: 0.9em;'>
-                            ✅ <b>{title[:50]}</b>: Güncellendi ({category})
-                        </div>
-                        """
+                        log_entry = get_log_entry_html(
+                            title=f"{title[:50]}",
+                            category=category,
+                            details="Güncellendi",
+                            status="success"
+                        )
                     else:
                         stats['failed'] += 1
-                        log_entry = f"""
-                        <div style='padding: 8px; margin: 3px 0; border-left: 3px solid #f44336; background: #ffebee; font-size: 0.9em;'>
-                            ❌ <b>{title[:50]}</b>: {result.get('message')}
-                        </div>
-                        """
+                        log_entry = get_log_entry_html(
+                            title=f"{title[:50]}",
+                            category=category,
+                            details=result.get('message'),
+                            status="error"
+                        )
                     
                     time.sleep(0.3) # Rate limit koruması
 
                 except Exception as e:
                     stats['failed'] += 1
-                    log_entry = f"<div style='color:red'>Hata: {str(e)}</div>"
+                    log_entry = get_log_entry_html(
+                        title=f"{title[:50]}",
+                        details=str(e),
+                        status="error"
+                    )
 
             log_buffer.insert(0, log_entry)
             if len(log_buffer) > 50: log_buffer.pop()
