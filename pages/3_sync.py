@@ -114,52 +114,53 @@ is_any_sync_running = st.session_state.sync_running or st.session_state.sync_mis
 
 # --- Ortak İlerleme ve Sonuç Gösterim Fonksiyonları ---
 def display_progress(title, results_key, log_key):
-    st.subheader(title)
     if st.button("🛑 Mevcut Görevi Durdur", use_container_width=True, key=f"stop_{results_key}"):
         if st.session_state.stop_sync_event:
             st.session_state.stop_sync_event.set()
             st.warning("Durdurma sinyali gönderildi. Mevcut işlemlerin bitmesi bekleniyor...")
 
-    progress_bar = st.progress(0, text="Başlatılıyor...")
-    stats_placeholder = st.empty()
-    log_expander = st.expander("Canlı Gelişmeleri Göster", expanded=True)
-    with log_expander:
+    with st.status(title, expanded=True) as status:
+        progress_bar = st.progress(0, text="Başlatılıyor...")
+        stats_placeholder = st.empty()
         log_placeholder = st.empty()
 
-    while True:
-        try:
-            update = st.session_state.progress_queue.get(timeout=1)
-            
-            if 'progress' in update:
-                progress_bar.progress(update['progress'] / 100.0, text=update.get('message', 'İşleniyor...'))
-            
-            if 'stats' in update:
-                stats = update['stats']
-                with stats_placeholder.container():
-                    cols = st.columns(5)
+        while True:
+            try:
+                update = st.session_state.progress_queue.get(timeout=1)
+
+                if 'progress' in update:
+                    progress_bar.progress(update['progress'] / 100.0, text=update.get('message', 'İşleniyor...'))
+                    status.update(label=f"{title} ({update['progress']}%)")
+
+                if 'stats' in update:
+                    stats = update['stats']
+                    with stats_placeholder.container():
+                        cols = st.columns(5)
                     cols[0].metric("Toplam", f"{stats.get('processed', 0)}/{stats.get('total', 0)}")
                     cols[1].metric("✅ Oluşturuldu", stats.get('created', 0))
                     cols[2].metric("🔄 Güncellendi", stats.get('updated', 0))
                     cols[3].metric("❌ Hatalı", stats.get('failed', 0))
                     cols[4].metric("⏭️ Atlandı", stats.get('skipped', 0))
 
-            if 'log_detail' in update:
-                st.session_state[log_key].insert(0, update['log_detail'])
-                log_html = "".join(st.session_state[log_key][:50])
-                log_placeholder.markdown(f'<div style="height:300px;overflow-y:scroll;border:1px solid #333;padding:10px;border-radius:5px;font-family:monospace;">{log_html}</div>', unsafe_allow_html=True)
-            
-            if update.get('status') in ['done', 'error']:
-                if update.get('status') == 'done':
-                    st.session_state[results_key] = update.get('results')
-                else:
-                    st.error(f"Bir hata oluştu: {update.get('message')}")
-                    st.session_state[results_key] = {'stats': {}, 'details': [{'status': 'error', 'reason': update.get('message')}]}
+                if 'log_detail' in update:
+                    st.session_state[log_key].insert(0, update['log_detail'])
+                    log_html = "".join(st.session_state[log_key][:50])
+                    log_placeholder.markdown(f'<div style="height:300px;overflow-y:scroll;border:1px solid #333;padding:10px;border-radius:5px;font-family:monospace;">{log_html}</div>', unsafe_allow_html=True)
+
+                if update.get('status') in ['done', 'error']:
+                    if update.get('status') == 'done':
+                        status.update(label="İşlem Tamamlandı!", state="complete", expanded=False)
+                        st.session_state[results_key] = update.get('results')
+                    else:
+                        status.update(label="Hata Oluştu!", state="error", expanded=True)
+                        st.error(f"Bir hata oluştu: {update.get('message')}")
+                        st.session_state[results_key] = {'stats': {}, 'details': [{'status': 'error', 'reason': update.get('message')}]}
+                    break
+            except queue.Empty:
+                time.sleep(1)
+            except Exception as e:
+                st.error(f"Arayüz güncelleme döngüsünde hata: {e}")
                 break
-        except queue.Empty:
-            time.sleep(1)
-        except Exception as e:
-            st.error(f"Arayüz güncelleme döngüsünde hata: {e}")
-            break
     
     st.session_state.sync_running = False
     st.session_state.sync_missing_running = False
