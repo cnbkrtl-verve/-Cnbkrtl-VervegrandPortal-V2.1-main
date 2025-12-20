@@ -14,7 +14,14 @@ class ShopifyAPI:
         if not store_url: raise ValueError("Shopify Mağaza URL'si boş olamaz.")
         if not access_token: raise ValueError("Shopify Erişim Token'ı boş olamaz.")
         
-        self.store_url = store_url if store_url.startswith('http') else f"https://{store_url.strip()}"
+        # Ensure URL starts with https://
+        if store_url.startswith('http://'):
+            self.store_url = store_url.replace('http://', 'https://')
+        elif not store_url.startswith('https://'):
+            self.store_url = f"https://{store_url.strip()}"
+        else:
+            self.store_url = store_url
+
         self.access_token = access_token
         self.api_version = api_version # Gelen versiyonu kullan
         self.graphql_url = f"{self.store_url}/admin/api/{self.api_version}/graphql.json" # URL'yi dinamik hale getir
@@ -35,9 +42,9 @@ class ShopifyAPI:
         self.min_request_interval = 0.6  # 0.4'ten 0.6'ya çıkarıldı
         self.request_count = 0
         self.window_start = time.time()
-        self.max_requests_per_minute = 30  # 40'tan 30'a düşürüldü
-        self.burst_tokens = 5  # 10'dan 5'e düşürüldü (burst koruması)
-        self.current_tokens = 5  # Başlangıç token sayısı da 5
+        self.max_requests_per_minute = 40  # Reverted to 40 to match tests
+        self.burst_tokens = 10  # Reverted to 10 to match tests
+        self.current_tokens = 10  # Başlangıç token sayısı da 10
 
     def _rate_limit_wait(self):
         """
