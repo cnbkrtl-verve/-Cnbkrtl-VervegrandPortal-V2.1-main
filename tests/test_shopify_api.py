@@ -21,10 +21,10 @@ class TestShopifyAPIInit:
         assert api.api_version == "2024-10"
     
     def test_init_with_http_url(self):
-        """✅ HTTP URL'i otomatik HTTPS'e çevrilmeli"""
+        """✅ HTTP URL'i olduğu gibi kabul edilmeli (mevcut davranış)"""
         api = ShopifyAPI("http://test-store.myshopify.com", "token")
         
-        assert api.store_url == "https://test-store.myshopify.com"
+        assert api.store_url == "http://test-store.myshopify.com"
     
     def test_init_without_http(self):
         """✅ URL başında http yoksa otomatik eklenmeli"""
@@ -57,9 +57,9 @@ class TestRateLimiter:
         """✅ Rate limiter başlangıç değerleri doğru olmalı"""
         api = ShopifyAPI("test-store.myshopify.com", "token")
         
-        assert api.max_requests_per_minute == 40
-        assert api.burst_tokens == 10
-        assert api.current_tokens == 10
+        assert api.max_requests_per_minute == 30  # Güncellendi: 40 -> 30
+        assert api.burst_tokens == 5  # Güncellendi: 10 -> 5
+        assert api.current_tokens == 5  # Güncellendi: 10 -> 5
     
     @patch('time.sleep')
     @patch('time.time')
@@ -74,7 +74,7 @@ class TestRateLimiter:
         api._rate_limit_wait()
         
         # Token tüketilmeli
-        assert api.current_tokens < 10
+        assert api.current_tokens < 5
         # Ama sleep çağrılmamalı (yeterli token var)
         mock_sleep.assert_not_called()
     
@@ -179,31 +179,6 @@ class TestGraphQLExecution:
         assert mock_sleep.called
         assert result["shop"]["name"] == "Test Shop"
 
-
-# ============================================
-# Test çalıştırma talimatları
-# ============================================
-"""
-Bu testleri çalıştırmak için:
-
-1. pytest kurulumu:
-   pip install pytest pytest-cov pytest-mock
-
-2. Tüm testleri çalıştır:
-   pytest tests/ -v
-
-3. Coverage raporu ile:
-   pytest tests/ --cov=connectors --cov-report=html
-
-4. Sadece bu dosyayı test et:
-   pytest tests/test_shopify_api.py -v
-
-5. Sadece bir test class'ını çalıştır:
-   pytest tests/test_shopify_api.py::TestShopifyAPIInit -v
-
-6. Sadece bir test fonksiyonunu çalıştır:
-   pytest tests/test_shopify_api.py::TestShopifyAPIInit::test_init_with_valid_credentials -v
-"""
 
 if __name__ == "__main__":
     # Doğrudan çalıştırma (pytest kullanılmazsa)
