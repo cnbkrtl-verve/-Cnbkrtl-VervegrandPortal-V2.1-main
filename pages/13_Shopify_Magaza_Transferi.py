@@ -15,6 +15,8 @@ from config_manager import load_all_user_keys
 
 # 🎨 GLOBAL CSS YÜKLEME
 from utils.style_loader import load_global_css
+# Monkey-patching için utils_ui modülünü yükle
+import utils_ui  # noqa: F401
 load_global_css()
 st.set_page_config(layout="wide")
 st.title("🚚 Shopify Mağazaları Arası Sipariş Transferi")
