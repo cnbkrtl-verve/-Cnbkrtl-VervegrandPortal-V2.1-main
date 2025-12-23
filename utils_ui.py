@@ -469,6 +469,11 @@ def inject_shopify_style():
         background-color: #e8f5fa;
         color: #1e4e79;
     }
+
+    .badge-gray {
+        background-color: #f1f2f3;
+        color: #202223;
+    }
     
     /* ============================================
        RESPONSIVE DESIGN
@@ -606,6 +611,40 @@ def show_shopify_toast(message: str, is_error: bool = False):
     """
     st.components.v1.html(toast_js, height=0)
 
+def badge(text: str, icon: str = None, color: str = "gray"):
+    """
+    Renders a badge component similar to Shopify's status badges.
+
+    Args:
+        text (str): The text content of the badge.
+        icon (str, optional): An emoji or icon character to display before the text.
+        color (str): Color theme of the badge ('success', 'warning', 'error', 'info', 'gray', 'green', 'yellow', 'red').
+                 'green' maps to 'success', 'yellow' to 'warning', 'red' to 'error'.
+    """
+    color_map = {
+        'green': 'success',
+        'yellow': 'warning',
+        'red': 'error',
+        'gray': 'gray',
+        'success': 'success',
+        'warning': 'warning',
+        'error': 'error',
+        'info': 'info'
+    }
+
+    final_color = color_map.get(color.lower(), 'gray')
+
+    icon_html = f'<span style="margin-right: 4px;">{icon}</span>' if icon else ''
+
+    badge_html = f"""
+    <span class="badge badge-{final_color}">
+        {icon_html}{text}
+    </span>
+    """
+    st.markdown(badge_html, unsafe_allow_html=True)
+
+# Monkey patch st.badge to enforce Polaris style (overriding native if exists)
+st.badge = badge
 
 # Example usage in a Streamlit page
 if __name__ == "__main__":
@@ -629,5 +668,12 @@ if __name__ == "__main__":
     with col3:
         st.metric("Revenue", "$12,345", "+8%")
     
+    st.write("### Badges Demo")
+    st.badge("Success", icon="✅", color="success")
+    st.badge("Warning", icon="⚠️", color="warning")
+    st.badge("Error", icon="❌", color="error")
+    st.badge("Info", icon="ℹ️", color="info")
+    st.badge("Gray", color="gray")
+
     if st.button("Show Toast Notification"):
         show_shopify_toast("This is a test notification!")
