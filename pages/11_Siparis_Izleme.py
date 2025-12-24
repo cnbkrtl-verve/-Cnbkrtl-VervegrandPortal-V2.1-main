@@ -216,7 +216,7 @@ if 'shopify_orders_display' in st.session_state:
                 # Status renkleri
                 status_colors = {
                     'PAID': 'green', 'PENDING': 'orange', 'REFUNDED': 'gray', 'PARTIALLY_PAID': 'yellow',
-                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'purple'
+                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'violet'
                 }
                 
                 with st.container(border=True):
@@ -227,9 +227,9 @@ if 'shopify_orders_display' in st.session_state:
                     with cols[1]:
                         st.write(f"**{total:.2f} {currency}**")
                     with cols[2]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{financial_status}</span>", unsafe_allow_html=True)
+                        st.badge(financial_status, color=status_colors.get(financial_status, 'gray'))
                     with cols[3]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{fulfillment_status}</span>", unsafe_allow_html=True)
+                        st.badge(fulfillment_status, color=status_colors.get(fulfillment_status, 'gray'))
                     with cols[4]:
                         # Güvenli tarih formatı
                         created_at = order.get('createdAt', '')
@@ -248,7 +248,7 @@ if 'shopify_orders_display' in st.session_state:
                 fulfillment_status = order.get('displayFulfillmentStatus', 'Bilinmiyor')
                 status_colors = {
                     'PAID': 'green', 'PENDING': 'orange', 'REFUNDED': 'gray', 'PARTIALLY_PAID': 'yellow',
-                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'purple'
+                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'violet'
                 }
                 
                 customer = order.get('customer') or {}
@@ -274,11 +274,13 @@ if 'shopify_orders_display' in st.session_state:
                     # Ana bilgiler
                     info_cols = st.columns([2, 1])
                     with info_cols[0]:
+                        fin_color = status_colors.get(financial_status, 'gray')
+                        ful_color = status_colors.get(fulfillment_status, 'gray')
                         st.markdown(f"""
                         **📅 Sipariş Tarihi:** {date_display}  
-                        **💳 Ödeme Durumu:** <span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{financial_status}</span>  
-                        **📦 Kargo Durumu:** <span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{fulfillment_status}</span>
-                        """, unsafe_allow_html=True)
+                        **💳 Ödeme Durumu:** :{fin_color}-badge[{financial_status}]
+                        **📦 Kargo Durumu:** :{ful_color}-badge[{fulfillment_status}]
+                        """)
                         
                         # Sipariş kimliği ve kaynağı
                         st.markdown(f"**🆔 Sipariş ID:** `{order.get('id', 'N/A')}`")
@@ -386,15 +388,16 @@ if 'shopify_orders_display' in st.session_state:
                         if order.get('tags'):
                             st.markdown("### 🏷️ Etiketler")
                             tags = order.get('tags', '').split(', ') if order.get('tags') else []
-                            for tag in tags[:5]:  # İlk 5 etiketi göster
-                                st.markdown(f"<span style='background-color:#e1f5fe; color:#01579b; padding: 2px 6px; border-radius: 10px; font-size: 12px; display: inline-block; margin: 2px;'>🏷️ {tag}</span>", unsafe_allow_html=True)
+                            tag_badges = " ".join([f":blue-badge[🏷️ {tag}]" for tag in tags[:5]])
+                            st.markdown(tag_badges)
                         
                         # Risk analizi (varsa)
                         if order.get('riskLevel'):
                             risk_colors = {'LOW': 'green', 'MEDIUM': 'orange', 'HIGH': 'red'}
                             risk_level = order.get('riskLevel', 'UNKNOWN')
+                            risk_color = risk_colors.get(risk_level, 'gray')
                             st.markdown("### ⚠️ Risk Seviyesi")
-                            st.markdown(f"<span style='background-color:{risk_colors.get(risk_level, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{risk_level}</span>", unsafe_allow_html=True)
+                            st.badge(risk_level, color=risk_color)
                         
                         # İade bilgileri varsa
                         if order.get('returns'):
