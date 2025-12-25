@@ -697,31 +697,38 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # Optimize batch size
+        # Reduced to 5 to keep GraphQL query cost low (5 products * 50 variants = ~250-300 cost points, very safe within 1000 limit)
+        batch_size = 5
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
-            query = """
-            query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
-                edges {
-                  node {
+            # Note: The 'first' argument should be enough to cover the batch size if possible,
+            # but since we filter by SKUs, we might get fewer products than SKUs if some are missing,
+            # or more if multiple products match (unlikely with SKU).
+            # Setting first: batch_size * 2 to be safe.
+            limit = batch_size * 2
+
+            query = f"""
+            query getProductsBySku($query: String!) {{
+              products(first: {limit}, query: $query) {{
+                edges {{
+                  node {{
                     id
-                    variants(first: 50) {
-                      edges {
-                        node { 
+                    variants(first: 50) {{
+                      edges {{
+                        node {{
                           id
                           sku 
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
             """
 
             try:
@@ -740,15 +747,14 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # Removed hardcoded sleep(3). execute_graphql handles rate limiting.
+                # Just a small breather to avoid overwhelming local network/logs if running very fast
+                time.sleep(0.1)
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
                 # Hata durumunda da biraz bekle
-                time.sleep(5)
+                time.sleep(2)
                 raise e
 
         logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")

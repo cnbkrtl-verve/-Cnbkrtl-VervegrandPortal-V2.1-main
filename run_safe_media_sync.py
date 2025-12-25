@@ -80,6 +80,16 @@ def main():
         
         start_time = time.time()
         
+        # Batch Optimization: Fetch all Shopify IDs at once
+        logging.info("Shopify ID'leri toplu olarak çekiliyor...")
+        all_skus = [p.get('sku') for p in products_to_sync if p.get('sku')]
+        sku_to_shopify_map = shopify_api.get_variant_ids_by_skus(all_skus, search_by_product_sku=True)
+
+        # Normalize keys to lowercase for case-insensitive lookup
+        sku_to_shopify_map_normalized = {k.lower(): v for k, v in sku_to_shopify_map.items()}
+
+        logging.info(f"Toplu arama tamamlandı. {len(sku_to_shopify_map)} SKU eşleşti.")
+
         # Her ürün için medya sync
         for i, sentos_product in enumerate(products_to_sync, 1):
             product_sku = sentos_product.get('sku', 'N/A')
@@ -88,16 +98,16 @@ def main():
             logging.info(f"[{i}/{len(products_to_sync)}] İşleniyor: {product_sku} - {product_name}")
             
             try:
-                # Shopify'da ürünü bul
-                shopify_products = shopify_api.get_variant_ids_by_skus([product_sku], search_by_product_sku=True)
+                # Shopify'da ürünü bul (Lookup from batch result, case-insensitive)
+                shopify_product_info = sku_to_shopify_map_normalized.get(str(product_sku).lower())
                 
-                if not shopify_products:
+                if not shopify_product_info:
                     logging.warning(f"Ürün Shopify'da bulunamadı: {product_sku}")
                     stats['skipped'] += 1
                     continue
                 
                 # İlk eşleşen ürünün product_id'sini al
-                product_gid = list(shopify_products.values())[0]['product_id']
+                product_gid = shopify_product_info['product_id']
                 
                 # Medya senkronizasyonu yap - GÜVENLİ MODDA
                 changes = sync_media(
