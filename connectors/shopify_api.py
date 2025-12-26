@@ -100,6 +100,9 @@ class ShopifyAPI:
 
     def execute_graphql(self, query, variables=None):
         """GraphQL sorgusunu çalıştırır - gelişmiş hata yönetimi ile."""
+        # Rate limit kontrolü yap
+        self._rate_limit_wait()
+
         payload = {'query': query, 'variables': variables or {}}
         max_retries = 10  # 8'den 10'a çıkarıldı
         retry_delay = 3  # 2'den 3'e çıkarıldı (daha uzun bekleme)
@@ -697,16 +700,17 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # OPTIMIZATION: Rate limiting execute_graphql içinde yapıldığı için batch arttırıldı
+        batch_size = 10  # 2'den 10'a çıkarıldı
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # first: 20 yaptık çünkü batch size 10, her ürünün 1 varyantı olsa bile yeterli buffer olsun
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 20, query: $query) {
                 edges {
                   node {
                     id
@@ -740,10 +744,7 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # OPTIMIZATION: Manual sleep removed, relying on _rate_limit_wait in execute_graphql
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
