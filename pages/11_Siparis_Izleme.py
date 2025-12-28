@@ -17,6 +17,9 @@ if project_root not in sys.path:
 from utils.style_loader import load_global_css
 load_global_css()
 
+# Import utils_ui to activate st.badge monkey-patch
+import utils_ui
+
 # ---------------------------------------------------------------------
 
 from connectors.shopify_api import ShopifyAPI
@@ -215,8 +218,8 @@ if 'shopify_orders_display' in st.session_state:
                 
                 # Status renkleri
                 status_colors = {
-                    'PAID': 'green', 'PENDING': 'orange', 'REFUNDED': 'gray', 'PARTIALLY_PAID': 'yellow',
-                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'purple'
+                    'PAID': 'green', 'PENDING': 'yellow', 'REFUNDED': 'red', 'PARTIALLY_PAID': 'yellow',
+                    'FULFILLED': 'blue', 'UNFULFILLED': 'yellow', 'PARTIALLY_FULFILLED': 'blue'
                 }
                 
                 with st.container(border=True):
@@ -227,9 +230,9 @@ if 'shopify_orders_display' in st.session_state:
                     with cols[1]:
                         st.write(f"**{total:.2f} {currency}**")
                     with cols[2]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{financial_status}</span>", unsafe_allow_html=True)
+                        st.badge(financial_status, color=status_colors.get(financial_status, 'gray'))
                     with cols[3]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{fulfillment_status}</span>", unsafe_allow_html=True)
+                        st.badge(fulfillment_status, color=status_colors.get(fulfillment_status, 'gray'))
                     with cols[4]:
                         # Güvenli tarih formatı
                         created_at = order.get('createdAt', '')
