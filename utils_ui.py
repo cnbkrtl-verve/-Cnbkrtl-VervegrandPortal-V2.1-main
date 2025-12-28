@@ -469,6 +469,11 @@ def inject_shopify_style():
         background-color: #e8f5fa;
         color: #1e4e79;
     }
+
+    .badge-subdued, .badge-gray {
+        background-color: #f1f2f3;
+        color: #6d7175;
+    }
     
     /* ============================================
        RESPONSIVE DESIGN
@@ -605,6 +610,34 @@ def show_shopify_toast(message: str, is_error: bool = False):
     </script>
     """
     st.components.v1.html(toast_js, height=0)
+
+
+def badge(text, icon=None, color="gray"):
+    """
+    Renders a badge component.
+    Args:
+        text: The text to display.
+        icon: An optional icon (emoji or text).
+        color: The color of the badge (green, red, yellow, blue, gray).
+    """
+    color_map = {
+        "green": "success",
+        "red": "error",
+        "yellow": "warning",
+        "blue": "info",
+        "gray": "subdued"
+    }
+
+    status_class = color_map.get(color, "subdued")
+    icon_html = f'<span style="margin-right: 4px;">{icon}</span>' if icon else ""
+
+    html = f'<span class="badge badge-{status_class}">{icon_html}{text}</span>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# Monkey patch st.badge
+if not hasattr(st, 'badge'):
+    st.badge = badge
 
 
 # Example usage in a Streamlit page

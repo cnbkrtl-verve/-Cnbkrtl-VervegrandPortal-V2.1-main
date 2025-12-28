@@ -23,6 +23,9 @@ if project_root not in sys.path:
 from utils.style_loader import load_global_css
 load_global_css()
 
+# Import utils_ui to activate st.badge monkey-patch
+import utils_ui
+
 
 try:
     from operations.log_manager import LogManager, log_manager
@@ -453,13 +456,13 @@ if show_details:
                     # İşlem durumu göstergesi
                     status = row.get('status', 'unknown')
                     if status == 'completed':
-                        st.success("✅ Başarılı")
+                        st.badge("Başarılı", icon="✅", color="green")
                     elif status == 'failed':
-                        st.error("❌ Başarısız")
+                        st.badge("Başarısız", icon="❌", color="red")
                     elif status == 'partial':
-                        st.warning("⚠️ Kısmi")
+                        st.badge("Kısmi", icon="⚠️", color="yellow")
                     else:
-                        st.info("ℹ️ Diğer")
+                        st.badge("Diğer", icon="ℹ️", color="blue")
                 
                 # Hata mesajı
                 if pd.notna(row.get('error_message')):
