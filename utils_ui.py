@@ -631,3 +631,64 @@ if __name__ == "__main__":
     
     if st.button("Show Toast Notification"):
         show_shopify_toast("This is a test notification!")
+def create_connection_status_card(title: str, status: str, variant: str = "primary"):
+    """
+    Renders a brand-colored status card for API connections.
+
+    Args:
+        title: Title of the service (e.g. "Shopify")
+        status: Connection status ('connected', 'pending', 'failed')
+        variant: Color variant ('primary' for Shopify, 'success' for Sentos/Green)
+    """
+    status_map = {
+        'connected': {'icon': '✅', 'label': 'Connected'},
+        'pending': {'icon': '⚠️', 'label': 'Pending'},
+        'failed': {'icon': '❌', 'label': 'Failed'},
+        'unknown': {'icon': '❓', 'label': 'Unknown'}
+    }
+
+    # Normalize status string
+    norm_status = status.lower() if status else 'unknown'
+    s_info = status_map.get(norm_status, status_map['unknown'])
+
+    # CSS Variable Mapping for Gradients
+    if variant == 'primary':
+        # Indigo/Purple for Shopify
+        grad_start = "var(--accent-primary, #6366f1)"
+        grad_end = "var(--accent-secondary, #8b5cf6)"
+    elif variant == 'success':
+        # Green for Sentos
+        grad_start = "var(--accent-success, #10b981)"
+        grad_end = "#059669"
+    else:
+        grad_start = "#6b7280"
+        grad_end = "#4b5563"
+
+    html = f"""
+    <div role="status" aria-label="{title} Status: {s_info['label']}" style="
+        background: linear-gradient(135deg, {grad_start}, {grad_end});
+        padding: 1.25rem;
+        border-radius: 12px;
+        text-align: center;
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: transform 0.2s;
+    ">
+        <div style="font-size: 2em; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.1);" aria-hidden="true">{s_info['icon']}</div>
+        <div style="font-weight: 700; font-size: 1.1em; margin-bottom: 0.25rem; letter-spacing: -0.01em;">{title}</div>
+        <div style="
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+            text-transform: capitalize;
+            backdrop-filter: blur(4px);
+        ">
+            {status}
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)

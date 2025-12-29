@@ -14,6 +14,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# Import utils_ui for UX components
+import utils_ui
+
 # 🎨 GLOBAL CSS YÜKLEME
 from utils.style_loader import load_global_css
 load_global_css()
@@ -84,25 +87,11 @@ st.markdown("""
 col_status1, col_status2 = st.columns(2)
 with col_status1:
     shopify_status = st.session_state.get('shopify_status', 'pending')
-    status_emoji = "✅" if shopify_status == 'connected' else "⚠️" if shopify_status == 'pending' else "❌"
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 1rem; border-radius: 12px; text-align: center;">
-        <div style="font-size: 2em;">{status_emoji}</div>
-        <div style="font-weight: 700; font-size: 1.1em;">Shopify Status</div>
-        <div style="opacity: 0.9; text-transform: capitalize;">{shopify_status}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    utils_ui.create_connection_status_card("Shopify Store", shopify_status, "primary")
 
 with col_status2:
     sentos_status = st.session_state.get('sentos_status', 'pending')
-    status_emoji = "✅" if sentos_status == 'connected' else "⚠️" if sentos_status == 'pending' else "❌"
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 1rem; border-radius: 12px; text-align: center;">
-        <div style="font-size: 2em;">{status_emoji}</div>
-        <div style="font-weight: 700; font-size: 1.1em;">Sentos Status</div>
-        <div style="opacity: 0.9; text-transform: capitalize;">{sentos_status}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    utils_ui.create_connection_status_card("Sentos API", sentos_status, "success")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
