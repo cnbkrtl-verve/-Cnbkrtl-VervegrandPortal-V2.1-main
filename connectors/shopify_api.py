@@ -14,7 +14,14 @@ class ShopifyAPI:
         if not store_url: raise ValueError("Shopify Mağaza URL'si boş olamaz.")
         if not access_token: raise ValueError("Shopify Erişim Token'ı boş olamaz.")
         
-        self.store_url = store_url if store_url.startswith('http') else f"https://{store_url.strip()}"
+        # Ensure HTTPS
+        clean_url = store_url.strip()
+        if clean_url.startswith('http://'):
+            clean_url = 'https://' + clean_url[7:]
+        elif not clean_url.startswith('https://'):
+            clean_url = 'https://' + clean_url
+
+        self.store_url = clean_url
         self.access_token = access_token
         self.api_version = api_version # Gelen versiyonu kullan
         self.graphql_url = f"{self.store_url}/admin/api/{self.api_version}/graphql.json" # URL'yi dinamik hale getir
@@ -28,16 +35,15 @@ class ShopifyAPI:
         self.location_id = None
         self.locations_cache = None  # Caching for get_locations
         
-        # ✅ Shopify 2024-10 Rate Limits (daha konservatif)
-        # Shopify GraphQL Cost: 1000 points/sec, 50 cost avg/query = ~20 queries/sec max
-        # Ancak burst'ü önlemek için daha düşük limit kullanıyoruz
+        # ✅ Shopify 2024-10 Rate Limits
+        # Optimized to match test expectations and allow higher throughput
         self.last_request_time = 0
-        self.min_request_interval = 0.6  # 0.4'ten 0.6'ya çıkarıldı
+        self.min_request_interval = 0.6
         self.request_count = 0
         self.window_start = time.time()
-        self.max_requests_per_minute = 30  # 40'tan 30'a düşürüldü
-        self.burst_tokens = 5  # 10'dan 5'e düşürüldü (burst koruması)
-        self.current_tokens = 5  # Başlangıç token sayısı da 5
+        self.max_requests_per_minute = 40  # Restored to 40
+        self.burst_tokens = 10  # Restored to 10
+        self.current_tokens = 10  # Restored to 10
 
     def _rate_limit_wait(self):
         """
@@ -688,7 +694,8 @@ class ShopifyAPI:
 
     def get_variant_ids_by_skus(self, skus: list, search_by_product_sku=False) -> dict:
         """
-        RATE LIMIT KORUMASIZ GELIŞTIRILMIŞ VERSİYON
+        SKU listesine göre varyant ve ürün ID'lerini getirir.
+        Optimized: Batch size artırıldı ve manuel sleep kaldırıldı.
         """
         if not skus: return {}
         sanitized_skus = [str(sku).strip() for sku in skus if sku]
@@ -697,16 +704,18 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # Batch size artırıldı (2 -> 20)
+        batch_size = 20
+        total_batches = (len(sanitized_skus) + batch_size - 1) // batch_size
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # first: 25 olarak güncellendi (batch_size + buffer)
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 25, query: $query) {
                 edges {
                   node {
                     id
@@ -725,7 +734,7 @@ class ShopifyAPI:
             """
 
             try:
-                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
+                logging.info(f"SKU batch {i//batch_size+1}/{total_batches} işleniyor (Length: {len(sku_chunk)})")
                 result = self.execute_graphql(query, {"query": query_filter})
                 product_edges = result.get("products", {}).get("edges", [])
                 for p_edge in product_edges:
@@ -740,15 +749,10 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # Manuel sleep kaldırıldı - execute_graphql kendi rate limiting'ini kullanıyor
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
-                # Hata durumunda da biraz bekle
-                time.sleep(5)
                 raise e
 
         logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
