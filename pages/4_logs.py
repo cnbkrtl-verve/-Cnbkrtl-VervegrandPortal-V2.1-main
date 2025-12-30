@@ -452,14 +452,20 @@ if show_details:
                 with detail_cols[2]:
                     # İşlem durumu göstergesi
                     status = row.get('status', 'unknown')
+                    badge_class = "badge-info"
+                    status_text = "Diğer"
+
                     if status == 'completed':
-                        st.success("✅ Başarılı")
+                        badge_class = "badge-success"
+                        status_text = "Başarılı"
                     elif status == 'failed':
-                        st.error("❌ Başarısız")
+                        badge_class = "badge-error"
+                        status_text = "Başarısız"
                     elif status == 'partial':
-                        st.warning("⚠️ Kısmi")
-                    else:
-                        st.info("ℹ️ Diğer")
+                        badge_class = "badge-warning"
+                        status_text = "Kısmi"
+
+                    st.markdown(f'<div style="margin-top: 10px;"><span class="badge {badge_class}">{status_text}</span></div>', unsafe_allow_html=True)
                 
                 # Hata mesajı
                 if pd.notna(row.get('error_message')):
