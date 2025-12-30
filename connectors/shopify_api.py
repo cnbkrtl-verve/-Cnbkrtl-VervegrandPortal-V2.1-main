@@ -14,7 +14,9 @@ class ShopifyAPI:
         if not store_url: raise ValueError("Shopify Mağaza URL'si boş olamaz.")
         if not access_token: raise ValueError("Shopify Erişim Token'ı boş olamaz.")
         
-        self.store_url = store_url if store_url.startswith('http') else f"https://{store_url.strip()}"
+        self.store_url = store_url.strip() if store_url.startswith('http') else f"https://{store_url.strip()}"
+        if self.store_url.startswith('http://'):
+            self.store_url = self.store_url.replace('http://', 'https://')
         self.access_token = access_token
         self.api_version = api_version # Gelen versiyonu kullan
         self.graphql_url = f"{self.store_url}/admin/api/{self.api_version}/graphql.json" # URL'yi dinamik hale getir
@@ -111,6 +113,9 @@ class ShopifyAPI:
             
         for attempt in range(max_retries):
             try:
+                # ✅ Rate limit kontrolü (Token Bucket)
+                self._rate_limit_wait()
+
                 response = requests.post(self.graphql_url, headers=self.headers, json=payload, timeout=90)
                 response.raise_for_status()
                 response_data = response.json()
@@ -697,16 +702,20 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # ⚡ Bolt: Batch boyutu 50'ye çıkarıldı ve sleep kaldırıldı.
+        # execute_graphql içindeki token bucket (rate limiter) kullanılacak.
+        batch_size = 50
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
+            # ⚡ Bolt: Query filter optimization
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # ⚡ Bolt: first: 50 is enough for 50 SKUs, assuming 1 product per SKU
+            # Increased from 10 to 50 to match batch size
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 50, query: $query) {
                 edges {
                   node {
                     id
@@ -725,7 +734,7 @@ class ShopifyAPI:
             """
 
             try:
-                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
+                logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor.")
                 result = self.execute_graphql(query, {"query": query_filter})
                 product_edges = result.get("products", {}).get("edges", [])
                 for p_edge in product_edges:
@@ -740,15 +749,10 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # ⚡ Bolt: Sleep removed. execute_graphql handles rate limiting via _rate_limit_wait()
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
-                # Hata durumunda da biraz bekle
-                time.sleep(5)
                 raise e
 
         logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
