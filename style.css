@@ -115,6 +115,14 @@ h1, h2, h3 {
     color: var(--accent-primary) !important;
 }
 
+/* Accessibility - Focus States */
+.stButton > button:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--accent-primary) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.3) !important;
+}
+
 /* Primary Button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
