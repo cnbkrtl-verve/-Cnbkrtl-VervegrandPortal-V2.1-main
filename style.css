@@ -115,6 +115,12 @@ h1, h2, h3 {
     color: var(--accent-primary) !important;
 }
 
+/* Accessible Focus States */
+.stButton > button:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px var(--primary-bg), 0 0 0 4px var(--accent-primary) !important;
+}
+
 /* Primary Button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
@@ -126,6 +132,10 @@ h1, h2, h3 {
 .stButton > button[kind="primary"]:hover {
     box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5) !important;
     transform: translateY(-1px);
+}
+
+.stButton > button[kind="primary"]:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary-bg), 0 0 0 4px var(--accent-secondary) !important;
 }
 
 /* Progress Bars */
