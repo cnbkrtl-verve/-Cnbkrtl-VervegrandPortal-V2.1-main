@@ -697,8 +697,8 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # BOLT OPTIMIZATION: Increased batch size for performance
+        batch_size = 20
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
@@ -706,7 +706,7 @@ class ShopifyAPI:
             
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 25, query: $query) {
                 edges {
                   node {
                     id
@@ -740,10 +740,9 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
+                # Rate limit için kısa bekleme (execute_graphql zaten throttling yönetiyor)
                 if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                    time.sleep(0.5)
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
