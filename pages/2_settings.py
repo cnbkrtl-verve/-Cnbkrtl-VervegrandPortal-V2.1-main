@@ -79,17 +79,24 @@ st.markdown("---")
 # --- Bağlantı Testi Bölümü ---
 st.subheader("🧪 Bağlantı Testleri")
 if st.button("🔄 Tüm Bağlantıları Yeniden Test Et", use_container_width=True, type="primary"):
-    with st.spinner("Bağlantılar test ediliyor..."):
+    with st.status("Bağlantılar test ediliyor...", expanded=True) as status:
         # Shopify Testi
+        st.write("Shopify bağlantısı kontrol ediliyor...")
         shopify_store = st.session_state.get('shopify_store')
         shopify_token = st.session_state.get('shopify_token')
+
+        shopify_success = False
         if shopify_store and shopify_token:
             try:
                 api = ShopifyAPI(shopify_store, shopify_token)
                 result = api.test_connection()  # Artık bu metot mevcut
                 st.session_state.shopify_status = 'connected' if result.get('success') else 'failed'
                 st.session_state.shopify_data = result
-                st.success(f"✅ Shopify bağlantısı başarılı! Mağaza: {result.get('name', 'N/A')}")
+                if result.get('success'):
+                    shopify_success = True
+                    st.success(f"✅ Shopify bağlantısı başarılı! Mağaza: {result.get('name', 'N/A')}")
+                else:
+                    st.error(f"❌ Shopify bağlantısı başarısız: {result.get('message')}")
             except Exception as e:
                 st.session_state.shopify_status = 'failed'
                 st.error(f"❌ Shopify Bağlantısı kurulamadı: {e}")
@@ -97,19 +104,32 @@ if st.button("🔄 Tüm Bağlantıları Yeniden Test Et", use_container_width=Tr
             st.warning("Shopify bilgileri eksik, test edilemedi.")
 
         # Sentos Testi
+        st.write("Sentos bağlantısı kontrol ediliyor...")
         sentos_url = st.session_state.get('sentos_api_url')
         sentos_key = st.session_state.get('sentos_api_key')
         sentos_secret = st.session_state.get('sentos_api_secret')
         sentos_cookie = st.session_state.get('sentos_cookie')
+
+        sentos_success = False
         if sentos_url and sentos_key:
             try:
                 api = SentosAPI(sentos_url, sentos_key, sentos_secret, sentos_cookie)
                 result = api.test_connection()  # Bu metot zaten mevcut
                 st.session_state.sentos_status = 'connected' if result.get('success') else 'failed'
                 st.session_state.sentos_data = result
-                st.success(f"✅ Sentos bağlantısı başarılı! Toplam ürün: {result.get('total_products', 0)}")
+                if result.get('success'):
+                    sentos_success = True
+                    st.success(f"✅ Sentos bağlantısı başarılı! Toplam ürün: {result.get('total_products', 0)}")
+                else:
+                    st.error(f"❌ Sentos bağlantısı başarısız: {result.get('message')}")
             except Exception as e:
                 st.session_state.sentos_status = 'failed'
                 st.error(f"❌ Sentos Bağlantısı kurulamadı: {e}")
         else:
             st.warning("Sentos bilgileri eksik, test edilemedi.")
+
+        # Final durum güncellemesi
+        if shopify_success and sentos_success:
+            status.update(label="✅ Tüm bağlantı testleri başarıyla tamamlandı!", state="complete", expanded=False)
+        else:
+            status.update(label="⚠️ Bağlantı testleri tamamlandı (bazı hatalar var)", state="error", expanded=True)
