@@ -510,6 +510,41 @@ def inject_shopify_style():
     st.markdown(shopify_css, unsafe_allow_html=True)
 
 
+def get_status_badge_html(status: str, variant: str = None) -> str:
+    """
+    Generates HTML for a status badge following Shopify Polaris styles.
+
+    Args:
+        status: The text to display in the badge.
+        variant: The visual variant ('success', 'warning', 'error', 'info').
+                 If None, tries to infer from status text.
+
+    Returns:
+        str: HTML string for the badge.
+    """
+    if not status:
+        return ""
+
+    status_lower = status.lower()
+
+    # Auto-detect variant if not provided
+    if not variant:
+        # Check explicit negative/warning states first to avoid partial matches
+        # ADDED: 'unfulfilled' to warning list to prevent substring match with 'fulfilled'
+        if any(x in status_lower for x in ['partially', 'pending', 'warning', 'unfulfilled']):
+            variant = 'warning'
+        elif any(x in status_lower for x in ['failed', 'error', 'refunded', 'cancelled']):
+            variant = 'error'
+        # Then check positive states
+        elif any(x in status_lower for x in ['paid', 'success', 'fulfilled', 'active', 'connected']):
+            variant = 'success'
+        else:
+            variant = 'info'
+
+    badge_class = f"badge badge-{variant}"
+    return f'<span class="{badge_class}">{status.upper()}</span>'
+
+
 def create_polaris_card(title: str, content: str, status: str = None):
     """
     Creates a Shopify Polaris-style card component
@@ -519,10 +554,7 @@ def create_polaris_card(title: str, content: str, status: str = None):
         content: Card content (can be HTML)
         status: Optional status badge ('success', 'warning', 'error', 'info')
     """
-    badge_html = ""
-    if status:
-        badge_class = f"badge badge-{status}"
-        badge_html = f'<span class="{badge_class}">{status.upper()}</span>'
+    badge_html = get_status_badge_html(status, status) if status else ""
     
     card_html = f"""
     <div class="polaris-card">
