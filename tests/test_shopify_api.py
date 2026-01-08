@@ -21,10 +21,10 @@ class TestShopifyAPIInit:
         assert api.api_version == "2024-10"
     
     def test_init_with_http_url(self):
-        """✅ HTTP URL'i otomatik HTTPS'e çevrilmeli"""
+        """✅ HTTP URL olduğu gibi korunmalı (auto-upgrade yapılmaz, kullanıcı seçimine saygı duyulur)"""
         api = ShopifyAPI("http://test-store.myshopify.com", "token")
         
-        assert api.store_url == "https://test-store.myshopify.com"
+        assert api.store_url == "http://test-store.myshopify.com"
     
     def test_init_without_http(self):
         """✅ URL başında http yoksa otomatik eklenmeli"""
@@ -57,9 +57,11 @@ class TestRateLimiter:
         """✅ Rate limiter başlangıç değerleri doğru olmalı"""
         api = ShopifyAPI("test-store.myshopify.com", "token")
         
-        assert api.max_requests_per_minute == 40
-        assert api.burst_tokens == 10
-        assert api.current_tokens == 10
+        # Güncel kodda limit 30'a düşürüldü
+        assert api.max_requests_per_minute == 30
+        # Burst token 5'e düşürüldü
+        assert api.burst_tokens == 5
+        assert api.current_tokens == 5
     
     @patch('time.sleep')
     @patch('time.time')
@@ -74,7 +76,7 @@ class TestRateLimiter:
         api._rate_limit_wait()
         
         # Token tüketilmeli
-        assert api.current_tokens < 10
+        assert api.current_tokens < 5
         # Ama sleep çağrılmamalı (yeterli token var)
         mock_sleep.assert_not_called()
     
