@@ -697,16 +697,18 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # BOLT OPTIMIZATION: Increased batch size from 2 to 20 for better performance.
+        # execute_graphql handles rate limiting with backoff, so we don't need excessive manual sleeping.
+        batch_size = 20
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # Request enough products to cover the batch + buffer
             query = """
             query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+              products(first: 30, query: $query) {
                 edges {
                   node {
                     id
@@ -740,15 +742,14 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # Manual rate limiting removed in favor of execute_graphql's handling.
+                # Adding a small polite delay if needed, but not 3 seconds.
+                time.sleep(0.2)
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
                 # Hata durumunda da biraz bekle
-                time.sleep(5)
+                time.sleep(2)
                 raise e
 
         logging.info(f"Toplam {len(sku_map)} eşleşen varyant detayı bulundu.")
