@@ -270,8 +270,8 @@ def upload_to_gsheets(df, sheet_name):
         return None, None
 
 # --- ARAYÜZ ---
-st.markdown("<h1>📄 Koleksiyon Bazlı Google E-Tablolar Raporu</h1>", unsafe_allow_html=True)
-st.markdown("<p>Shopify'daki ürünleri koleksiyonlara göre filtreleyerek stok ve fiyat bilgileriyle Google E-Tablolar'a aktarın.</p>", unsafe_allow_html=True)
+st.title("📄 Koleksiyon Bazlı Google E-Tablolar Raporu")
+st.markdown("Shopify'daki ürünleri koleksiyonlara göre filtreleyerek stok ve fiyat bilgileriyle Google E-Tablolar'a aktarın.")
 
 if st.session_state.get('shopify_status') != 'connected' or not st.session_state.get('gcp_service_account_json'):
     st.warning("Bu özelliği kullanmak için lütfen 'Ayarlar' sayfasından hem Shopify hem de Google E-Tablolar bağlantı ayarlarını tamamlayın.")
