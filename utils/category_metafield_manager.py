@@ -166,6 +166,8 @@ class CategoryMetafieldManager:
             recommended_attrs = shopify_recommendations.get('recommended_attributes', [])
             if recommended_attrs:
                 logging.info(f"✨ Shopify önerilen attribute'ler: {', '.join(recommended_attrs)}")
+                # Eğer önerilerde değer varsa (şu anki API yapısı sadece isim dönüyor olabilir)
+                # İleride buraya değer okuma eklenebilir.
         
         # ============================================
         # 2. VARYANT BİLGİLERİ
@@ -197,6 +199,7 @@ class CategoryMetafieldManager:
         # 3. TAGS & PRODUCT TYPE
         # ============================================
         # Etiketlerden desen, kumaş vb. yakalama
+        # Pattern listesi üzerinden kontrol
         for field, pattern_list in patterns.items():
             if field in values: continue
 
@@ -263,16 +266,24 @@ class CategoryMetafieldManager:
         shopify_metafields = []
         
         for field_key, template in metafield_templates.items():
+            # Config dosyasındaki 'key' alanını kullanıyoruz (örn: 'renk', 'beden')
+            # extracted_values sözlüğü de bu anahtarları kullanmalı
             key = template['key']
             
-            if key in extracted_values:
+            # Eğer 'kumas' ise ama extracted_values'de 'kumaş' varsa eşleştir
+            if key == 'kumas' and 'kumaş' in extracted_values:
+                 value = extracted_values['kumaş']
+            elif key in extracted_values:
                 value = extracted_values[key]
-                shopify_metafields.append({
-                    'namespace': template['namespace'],
-                    'key': template['key'],
-                    'value': value,
-                    'type': template['type']
-                })
+            else:
+                continue
+
+            shopify_metafields.append({
+                'namespace': template['namespace'],
+                'key': template['key'],
+                'value': value,
+                'type': template['type']
+            })
         
         return shopify_metafields
 
