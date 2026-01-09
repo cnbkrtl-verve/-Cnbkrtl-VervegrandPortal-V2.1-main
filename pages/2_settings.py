@@ -51,12 +51,12 @@ with st.container(border=True):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("<h5>🏪 Shopify Ayarları</h5>", unsafe_allow_html=True)
+        st.markdown("##### 🏪 Shopify Ayarları")
         st.text_input("Mağaza URL", value=st.session_state.get('shopify_store', 'Değer Bulunamadı'), disabled=True)
         st.text_input("Erişim Token'ı", value="********" if st.session_state.get('shopify_token') else 'Değer Bulunamadı', type="password", disabled=True)
     
     with col2:
-        st.markdown("<h5><img src='https://api.sentos.com.tr/img/favicon.png' width=20> Sentos API Ayarları</h5>", unsafe_allow_html=True)
+        st.markdown("##### ![Sentos](https://api.sentos.com.tr/img/favicon.png) Sentos API Ayarları")
         st.text_input("Sentos API URL", value=st.session_state.get('sentos_api_url', 'Değer Bulunamadı'), disabled=True)
         st.text_input("Sentos API Key", value=st.session_state.get('sentos_api_key', 'Değer Bulunamadı'), disabled=True)
         st.text_input("Sentos API Secret", value="********" if st.session_state.get('sentos_api_secret') else 'Değer Bulunamadı', type="password", disabled=True)
