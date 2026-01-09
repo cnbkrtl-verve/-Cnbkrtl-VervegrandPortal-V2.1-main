@@ -697,20 +697,24 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # ✅ OPTİMİZASYON: Batch boyutu 5'e çıkarıldı (Query Cost optimizasyonu ile)
+        # Cost hesabı: 5 (products) + 5 * 100 (variants) = 505.
+        # Bu maliyet 1000 limitinin altında, 2 burst'e izin verir.
+        batch_size = 5
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
             
+            # ✅ OPTİMİZASYON: Hardcoded 10 yerine dinamik $first değişkeni kullanıldı.
+            # Böylece sorgu maliyeti batch size ile orantılı olur.
             query = """
-            query getProductsBySku($query: String!) {
-              products(first: 10, query: $query) {
+            query getProductsBySku($query: String!, $first: Int!) {
+              products(first: $first, query: $query) {
                 edges {
                   node {
                     id
-                    variants(first: 50) {
+                    variants(first: 100) {
                       edges {
                         node { 
                           id
@@ -726,7 +730,11 @@ class ShopifyAPI:
 
             try:
                 logging.info(f"SKU batch {i//batch_size+1}/{len(range(0, len(sanitized_skus), batch_size))} işleniyor: {sku_chunk}")
-                result = self.execute_graphql(query, {"query": query_filter})
+                # $first değişkeni batch size (veya kalan chunk size) kadar gönderilir
+                result = self.execute_graphql(query, {
+                    "query": query_filter,
+                    "first": len(sku_chunk)
+                })
                 product_edges = result.get("products", {}).get("edges", [])
                 for p_edge in product_edges:
                     product_node = p_edge.get("node", {})
@@ -740,10 +748,8 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
+                # ✅ OPTİMİZASYON: Sabit 3 saniye bekleme kaldırıldı.
+                # execute_graphql içindeki akıllı rate limiter ve backoff mekanizması kullanılacak.
             
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
