@@ -185,14 +185,16 @@ if st.session_state.get("authentication_status"):
         st.metric(
             "Bugünkü Sipariş",
             s_stats.get('orders_today', '-'),
-            delta=f"{s_stats.get('revenue_today', 0):.2f} {s_stats.get('shop_info', {}).get('currencyCode', 'TL')}"
+            delta=f"{s_stats.get('revenue_today', 0):.2f} {s_stats.get('shop_info', {}).get('currencyCode', 'TL')}",
+            help="Yeşil ok, bugünkü toplam ciroyu gösterir."
         )
 
     with col2:
         st.metric(
             "Bu Ay Sipariş",
             s_stats.get('orders_this_month', '-'),
-             delta=f"{s_stats.get('revenue_this_month', 0):.2f} {s_stats.get('shop_info', {}).get('currencyCode', 'TL')}"
+             delta=f"{s_stats.get('revenue_this_month', 0):.2f} {s_stats.get('shop_info', {}).get('currencyCode', 'TL')}",
+             help="Yeşil ok, bu ayki toplam ciroyu gösterir."
         )
 
     with col3:
@@ -204,7 +206,12 @@ if st.session_state.get("authentication_status"):
 
     with col4:
          status_color = "🟢" if st.session_state.get('shopify_status') == 'connected' else "🔴"
-         st.metric("Sistem Durumu", "Aktif", delta=f"{status_color} Shopify Bağlı")
+         st.metric(
+             "Sistem Durumu",
+             "Aktif",
+             delta=f"{status_color} Shopify Bağlı",
+             help="API bağlantı durumunu gösterir."
+        )
 
     st.markdown("---")
 

@@ -354,11 +354,11 @@ sync_stats = get_sync_history_stats()
 
 sync_cols = st.columns(4)
 with sync_cols[0]:
-    st.metric("Toplam Sync", sync_stats['total_syncs'])
+    st.metric("Toplam Sync", sync_stats['total_syncs'], help="Bugüne kadar yapılan toplam senkronizasyon sayısı")
 with sync_cols[1]:
-    st.metric("Başarı Oranı", f"%{sync_stats['success_rate']:.1f}")
+    st.metric("Başarı Oranı", f"%{sync_stats['success_rate']:.1f}", help="Başarılı işlem / Toplam işlenen ürün")
 with sync_cols[2]:
-    st.metric("Son Sync", format_sync_time(sync_stats['last_sync_time']))
+    st.metric("Son Sync", format_sync_time(sync_stats['last_sync_time']), help="Son işlemin üzerinden geçen zaman")
 with sync_cols[3]:
     st.metric("Bu Hafta Sync", sync_stats.get('recent_syncs_week', 0))
 
