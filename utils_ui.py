@@ -469,6 +469,11 @@ def inject_shopify_style():
         background-color: #e8f5fa;
         color: #1e4e79;
     }
+
+    .badge-default {
+        background-color: #e1e3e5;
+        color: #454f5b;
+    }
     
     /* ============================================
        RESPONSIVE DESIGN
@@ -510,6 +515,58 @@ def inject_shopify_style():
     st.markdown(shopify_css, unsafe_allow_html=True)
 
 
+def get_status_badge_html(text: str, status: str = 'default') -> str:
+    """
+    Generates HTML for a consistent status badge.
+
+    Args:
+        text: The text to display inside the badge.
+        status: The semantic status ('success', 'warning', 'error', 'info', 'default').
+
+    Returns:
+        str: HTML string for the badge.
+    """
+    # Map common Shopify/App statuses to semantic classes if needed
+    status_map = {
+        'PAID': 'success',
+        'FULFILLED': 'success',
+        'active': 'success',
+        'PENDING': 'warning',
+        'UNFULFILLED': 'warning',
+        'PARTIALLY_PAID': 'warning',
+        'PARTIALLY_FULFILLED': 'warning',
+        'REFUNDED': 'default',
+        'archived': 'default',
+        'draft': 'info',
+        'cancelled': 'error',
+        'VOIDED': 'error'
+    }
+
+    # Use mapping if key exists, otherwise assume status is already a valid class suffix
+    # or fallback to 'default' if it's an unknown string that isn't a direct color match.
+    # We prefer passing semantic names (success, warning) but support raw Shopify enums too.
+
+    # Normalize inputs
+    text_upper = str(text).upper()
+    status_lower = str(status).lower()
+
+    semantic_status = status_lower
+
+    # If the input status was already a valid semantic key, use it.
+    valid_statuses = ['success', 'warning', 'error', 'info', 'default']
+
+    if status_lower in valid_statuses:
+        semantic_status = status_lower
+    elif text_upper in status_map:
+         semantic_status = status_map[text_upper]
+
+    # Fallback for unknown statuses
+    if semantic_status not in valid_statuses:
+        semantic_status = 'default'
+
+    return f'<span class="badge badge-{semantic_status}">{text}</span>'
+
+
 def create_polaris_card(title: str, content: str, status: str = None):
     """
     Creates a Shopify Polaris-style card component
@@ -521,8 +578,7 @@ def create_polaris_card(title: str, content: str, status: str = None):
     """
     badge_html = ""
     if status:
-        badge_class = f"badge badge-{status}"
-        badge_html = f'<span class="{badge_class}">{status.upper()}</span>'
+        badge_html = get_status_badge_html(status.upper(), status)
     
     card_html = f"""
     <div class="polaris-card">
