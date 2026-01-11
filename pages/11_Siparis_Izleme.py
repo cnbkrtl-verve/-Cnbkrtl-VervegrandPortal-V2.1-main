@@ -16,6 +16,7 @@ if project_root not in sys.path:
 # 🎨 GLOBAL CSS YÜKLEME
 from utils.style_loader import load_global_css
 load_global_css()
+from utils_ui import get_status_badge_html
 
 # ---------------------------------------------------------------------
 
@@ -213,12 +214,6 @@ if 'shopify_orders_display' in st.session_state:
                 financial_status = order.get('displayFinancialStatus', 'Bilinmiyor')
                 fulfillment_status = order.get('displayFulfillmentStatus', 'Bilinmiyor')
                 
-                # Status renkleri
-                status_colors = {
-                    'PAID': 'green', 'PENDING': 'orange', 'REFUNDED': 'gray', 'PARTIALLY_PAID': 'yellow',
-                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'purple'
-                }
-                
                 with st.container(border=True):
                     cols = st.columns([2, 1, 1, 1, 1])
                     with cols[0]:
@@ -227,9 +222,9 @@ if 'shopify_orders_display' in st.session_state:
                     with cols[1]:
                         st.write(f"**{total:.2f} {currency}**")
                     with cols[2]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{financial_status}</span>", unsafe_allow_html=True)
+                        st.markdown(get_status_badge_html(financial_status, financial_status), unsafe_allow_html=True)
                     with cols[3]:
-                        st.markdown(f"<span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 2px 6px; border-radius: 3px; font-size: 12px;'>{fulfillment_status}</span>", unsafe_allow_html=True)
+                        st.markdown(get_status_badge_html(fulfillment_status, fulfillment_status), unsafe_allow_html=True)
                     with cols[4]:
                         # Güvenli tarih formatı
                         created_at = order.get('createdAt', '')
@@ -246,10 +241,6 @@ if 'shopify_orders_display' in st.session_state:
             for order in page_orders:
                 financial_status = order.get('displayFinancialStatus', 'Bilinmiyor')
                 fulfillment_status = order.get('displayFulfillmentStatus', 'Bilinmiyor')
-                status_colors = {
-                    'PAID': 'green', 'PENDING': 'orange', 'REFUNDED': 'gray', 'PARTIALLY_PAID': 'yellow',
-                    'FULFILLED': 'blue', 'UNFULFILLED': 'orange', 'PARTIALLY_FULFILLED': 'purple'
-                }
                 
                 customer = order.get('customer') or {}
                 customer_name = f"{customer.get('firstName', '')} {customer.get('lastName', '')}".strip()
@@ -276,8 +267,8 @@ if 'shopify_orders_display' in st.session_state:
                     with info_cols[0]:
                         st.markdown(f"""
                         **📅 Sipariş Tarihi:** {date_display}  
-                        **💳 Ödeme Durumu:** <span style='background-color:{status_colors.get(financial_status, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{financial_status}</span>  
-                        **📦 Kargo Durumu:** <span style='background-color:{status_colors.get(fulfillment_status, 'gray')}; color:white; padding: 4px 8px; border-radius: 5px;'>{fulfillment_status}</span>
+                        **💳 Ödeme Durumu:** {get_status_badge_html(financial_status, financial_status)}
+                        **📦 Kargo Durumu:** {get_status_badge_html(fulfillment_status, fulfillment_status)}
                         """, unsafe_allow_html=True)
                         
                         # Sipariş kimliği ve kaynağı
