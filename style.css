@@ -115,6 +115,13 @@ h1, h2, h3 {
     color: var(--accent-primary) !important;
 }
 
+/* Accessibility: Keyboard Focus Indicators */
+.stButton > button:focus-visible {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5) !important;
+    outline: none !important;
+}
+
 /* Primary Button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
