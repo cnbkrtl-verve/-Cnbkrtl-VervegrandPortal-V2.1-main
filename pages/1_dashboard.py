@@ -20,6 +20,7 @@ from connectors.sentos_api import SentosAPI
 
 # 🎨 GLOBAL CSS YÜKLEME
 from utils.style_loader import load_global_css
+from utils_ui import render_status_badge  # Import badge helper
 load_global_css()
 
 # Dashboard helper fonksiyonları - local olarak tanımla
@@ -328,8 +329,8 @@ with main_cols[1]:
                     st.metric("Kategori Sayısı", sentos_stats.get('categories_count', 0))
                 
                 with info_cols[1]:
-                    st.metric("API Durumu", 
-                            "✅ Bağlı" if sentos_stats['api_status'] == 'connected' else "❌ Hata")
+                    status_badge = render_status_badge("BAĞLI", "success") if sentos_stats['api_status'] == 'connected' else render_status_badge("HATA", "error")
+                    st.markdown(f"**API Durumu:** {status_badge}", unsafe_allow_html=True)
                 
                 # Son güncellenen ürünler
                 recent_updates = sentos_stats.get('recent_updates', [])

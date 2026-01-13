@@ -86,6 +86,50 @@ h1, h2, h3 {
     backdrop-filter: blur(10px);
 }
 
+/* ============== BADGES ============== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    line-height: 1.5;
+}
+
+.badge-success {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: var(--accent-success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-warning {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--accent-warning);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-error {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: var(--accent-error);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-info {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: var(--accent-info);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-neutral {
+    background-color: rgba(156, 163, 175, 0.15);
+    color: #9ca3af;
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
 /* ============== STREAMLIT NATIVE COMPONENTS ============== */
 
 /* Inputs */
