@@ -607,6 +607,20 @@ def show_shopify_toast(message: str, is_error: bool = False):
     st.components.v1.html(toast_js, height=0)
 
 
+def render_status_badge(status_text: str, status_type: str = 'neutral') -> str:
+    """
+    Returns HTML for a status badge.
+
+    Args:
+        status_text: The text to display inside the badge.
+        status_type: 'success', 'warning', 'error', 'info', or 'neutral'.
+
+    Returns:
+        str: HTML string for the badge.
+    """
+    return f'<span class="badge badge-{status_type}">{status_text}</span>'
+
+
 # Example usage in a Streamlit page
 if __name__ == "__main__":
     # This is how you would use it in your pages
