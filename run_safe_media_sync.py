@@ -79,6 +79,16 @@ def main():
         }
         
         start_time = time.time()
+
+        # ⚡ Bulk Lookup Optimization
+        # Tüm SKU'ları topla ve tek seferde sorgula
+        logging.info("⚡ Shopify ürün ID'leri toplu olarak çekiliyor...")
+        all_skus = list(set([p.get('sku') for p in products_to_sync if p.get('sku')]))
+
+        # Batch lookup - şimdi optimize edilmiş metod ile
+        # search_by_product_sku=True çünkü ürünleri arıyoruz
+        sku_map = shopify_api.get_variant_ids_by_skus(all_skus, search_by_product_sku=True)
+        logging.info(f"⚡ {len(sku_map)} ürün eşleşmesi bulundu.")
         
         # Her ürün için medya sync
         for i, sentos_product in enumerate(products_to_sync, 1):
@@ -88,16 +98,16 @@ def main():
             logging.info(f"[{i}/{len(products_to_sync)}] İşleniyor: {product_sku} - {product_name}")
             
             try:
-                # Shopify'da ürünü bul
-                shopify_products = shopify_api.get_variant_ids_by_skus([product_sku], search_by_product_sku=True)
+                # Shopify'da ürünü map'ten bul
+                product_info = sku_map.get(product_sku)
                 
-                if not shopify_products:
-                    logging.warning(f"Ürün Shopify'da bulunamadı: {product_sku}")
+                if not product_info:
+                    logging.warning(f"Ürün Shopify'da bulunamadı (Map): {product_sku}")
                     stats['skipped'] += 1
                     continue
                 
-                # İlk eşleşen ürünün product_id'sini al
-                product_gid = list(shopify_products.values())[0]['product_id']
+                # Product GID al
+                product_gid = product_info['product_id']
                 
                 # Medya senkronizasyonu yap - GÜVENLİ MODDA
                 changes = sync_media(

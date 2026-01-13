@@ -14,7 +14,7 @@ class ShopifyAPI:
         if not store_url: raise ValueError("Shopify Mağaza URL'si boş olamaz.")
         if not access_token: raise ValueError("Shopify Erişim Token'ı boş olamaz.")
         
-        self.store_url = store_url if store_url.startswith('http') else f"https://{store_url.strip()}"
+        self.store_url = store_url.replace('http://', 'https://') if store_url.startswith('http') else f"https://{store_url.strip()}"
         self.access_token = access_token
         self.api_version = api_version # Gelen versiyonu kullan
         self.graphql_url = f"{self.store_url}/admin/api/{self.api_version}/graphql.json" # URL'yi dinamik hale getir
@@ -697,8 +697,8 @@ class ShopifyAPI:
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
         
-        # KRITIK: Batch boyutunu 2'ye düşür
-        batch_size = 2
+        # Performance optimization: Increased batch size to 10 and relying on execute_graphql rate limiter
+        batch_size = 10
         
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
@@ -740,11 +740,6 @@ class ShopifyAPI:
                                 "product_id": product_id
                             }
                 
-                # KRITIK: Her batch sonrası uzun bekleme
-                if i + batch_size < len(sanitized_skus):
-                    logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
-                    time.sleep(3)
-            
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
                 # Hata durumunda da biraz bekle
