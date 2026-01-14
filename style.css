@@ -17,6 +17,7 @@
     --accent-warning: #f59e0b;
     --accent-error: #ef4444;
     --accent-info: #3b82f6;
+    --accent-neutral: #9ca3af;
     
     /* Borders & Shadows */
     --border-color: rgba(250, 250, 250, 0.1);
@@ -163,6 +164,47 @@ h1, h2, h3 {
 /* Alerts */
 .stAlert {
     border-radius: var(--radius-md);
+}
+
+/* ============== BADGE COMPONENT ============== */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.badge-success {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: var(--accent-success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-warning {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: var(--accent-warning);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--accent-error);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-info {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: var(--accent-info);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-neutral {
+    background-color: rgba(156, 163, 175, 0.2);
+    color: var(--accent-neutral);
+    border: 1px solid rgba(156, 163, 175, 0.3);
 }
 
 /* ============== CUSTOM LOGGING ============== */
