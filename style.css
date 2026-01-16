@@ -115,6 +115,11 @@ h1, h2, h3 {
     color: var(--accent-primary) !important;
 }
 
+.stButton > button:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary-bg), 0 0 0 4px var(--accent-primary) !important;
+    outline: none !important;
+}
+
 /* Primary Button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
