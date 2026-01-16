@@ -5,3 +5,7 @@
 ## 2025-05-23 - Concise Status Badges
 **Learning:** Using `st.badge` for status indicators in lists (e.g., Payment Status) is much cleaner and more space-efficient than full-width alert components like `st.success` or `st.warning`. It keeps the visual flow of the list intact while still providing clear color-coded feedback.
 **Action:** Use `st.badge` for status columns in data grids or lists instead of alerts.
+
+## 2025-05-24 - Accessible Focus States for Custom Buttons
+**Learning:** Overriding Streamlit's default button styles with `!important` often removes the default focus ring, making the app inaccessible to keyboard users. A double-ring `box-shadow` (inner bg color + outer accent color) restores visibility without breaking the custom design.
+**Action:** Always add `:focus-visible` styles when customizing interactive elements in Streamlit, ensuring contrast against the background.
