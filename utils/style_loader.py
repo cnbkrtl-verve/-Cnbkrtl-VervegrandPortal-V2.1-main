@@ -67,5 +67,10 @@ def load_global_css():
             transform: translateY(-2px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 0 20px rgba(99, 102, 241, 0.4);
         }
+
+        .stButton > button:focus-visible {
+            box-shadow: 0 0 0 2px var(--primary-bg), 0 0 0 4px var(--accent-primary) !important;
+            outline: none !important;
+        }
         </style>
         """, unsafe_allow_html=True)
