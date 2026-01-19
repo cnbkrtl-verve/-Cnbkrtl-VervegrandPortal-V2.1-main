@@ -286,9 +286,12 @@ else:
     st.markdown("---")
     with st.expander("✨ Özellik: SKU ile Tekil Ürün Güncelle", expanded=True):
         st.info("Sentos'taki bir ürünün model kodunu (SKU) girerek Shopify'daki karşılığını anında ve tam olarak güncelleyebilirsiniz.")
-        sku_to_sync = st.text_input("Model Kodu (SKU)", placeholder="Örn: V-123-ABC")
         
-        if st.button("🔄 Ürünü Bul ve Senkronize Et", use_container_width=True, disabled=not sync_ready):
+        with st.form(key="sku_sync_form"):
+            sku_to_sync = st.text_input("Model Kodu (SKU)", placeholder="Örn: V-123-ABC")
+            submitted = st.form_submit_button("🔄 Ürünü Bul ve Senkronize Et", use_container_width=True, disabled=not sync_ready)
+
+        if submitted:
             if not sku_to_sync:
                 st.warning("Lütfen bir SKU girin.")
             else:
