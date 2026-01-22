@@ -145,6 +145,16 @@ authenticator = stauth.Authenticate(
 
 authenticator.login()
 
+
+def render_quick_action(icon, title, description, button_text, key, page, color="blue"):
+    """Renders a unified action card with consistent styling."""
+    with st.container(border=True):
+        st.markdown(f"#### :{color}[{icon} {title}]")
+        st.caption(description)
+        if st.button(button_text, key=key, use_container_width=True):
+            st.switch_page(page)
+
+
 if st.session_state.get("authentication_status"):
     load_and_verify_user_data(st.session_state.get("username"))
 
@@ -214,28 +224,40 @@ if st.session_state.get("authentication_status"):
     row1_1, row1_2, row1_3, row1_4 = st.columns(4)
 
     with row1_1:
-        st.info("**📦 Ürün Transferi**")
-        st.caption("Shopify mağazalar arası ürün aktarımı yapın.")
-        if st.button("Transfer Başlat", key="btn_transfer", use_container_width=True):
-             st.switch_page("pages/13_Shopify_Magaza_Transferi.py")
+        render_quick_action(
+            "📦", "Ürün Transferi",
+            "Shopify mağazalar arası ürün aktarımı yapın.",
+            "Transfer Başlat", "btn_transfer",
+            "pages/13_Shopify_Magaza_Transferi.py",
+            color="blue"
+        )
 
     with row1_2:
-        st.success("**📊 Satış Analizi**")
-        st.caption("Detaylı satış ve karlılık raporlarını inceleyin.")
-        if st.button("Raporları Gör", key="btn_reports", use_container_width=True):
-             st.switch_page("pages/14_Satis_Analizi.py")
+        render_quick_action(
+            "📊", "Satış Analizi",
+            "Detaylı satış ve karlılık raporlarını inceleyin.",
+            "Raporları Gör", "btn_reports",
+            "pages/14_Satis_Analizi.py",
+            color="green"
+        )
 
     with row1_3:
-        st.warning("**🏷️ Metafield Yönetimi**")
-        st.caption("Ürünler için özel alanları ve filtreleri düzenleyin.")
-        if st.button("Metafield Düzenle", key="btn_metafield", use_container_width=True):
-             st.switch_page("pages/8_Metafield_Yonetimi.py")
+        render_quick_action(
+            "🏷️", "Metafield Yönetimi",
+            "Ürünler için özel alanları ve filtreleri düzenleyin.",
+            "Metafield Düzenle", "btn_metafield",
+            "pages/8_Metafield_Yonetimi.py",
+            color="orange"
+        )
 
     with row1_4:
-        st.error("**🖥️ Sistem İzleme**")
-        st.caption("Logları, API durumunu ve hataları kontrol edin.")
-        if st.button("Monitörü Aç", key="btn_monitor", use_container_width=True):
-             st.switch_page("pages/99_Sistem_Durumu.py")
+        render_quick_action(
+            "🖥️", "Sistem İzleme",
+            "Logları, API durumunu ve hataları kontrol edin.",
+            "Monitörü Aç", "btn_monitor",
+            "pages/99_Sistem_Durumu.py",
+            color="red"
+        )
 
     # Categories View
     st.markdown("### 📂 Modüller")
