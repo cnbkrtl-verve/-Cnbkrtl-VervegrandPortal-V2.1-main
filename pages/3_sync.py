@@ -292,27 +292,33 @@ else:
             if not sku_to_sync:
                 st.warning("Lütfen bir SKU girin.")
             else:
-                with st.spinner(f"'{sku_to_sync}' SKU'lu ürün aranıyor ve senkronize ediliyor..."):
+                status_container = st.status(f"'{sku_to_sync}' işleniyor...", expanded=True)
+                with status_container:
+                    st.write("🔍 Sentos ve Shopify API bağlantıları kuruluyor...")
+                    st.write("📦 Ürün verileri aranıyor...")
+
                     result = sync_single_product_by_sku(
                         store_url=st.session_state.shopify_store, access_token=st.session_state.shopify_token,
                         sentos_api_url=st.session_state.sentos_api_url, sentos_api_key=st.session_state.sentos_api_key,
                         sentos_api_secret=st.session_state.sentos_api_secret, sentos_cookie=st.session_state.sentos_cookie,
                         sku=sku_to_sync
                     )
-                if result.get('success'):
-                    product_name = result.get('product_name', sku_to_sync)
-                    changes = result.get('changes', [])
                     
-                    st.success(f"✅ '{product_name}' ürünü başarıyla güncellendi.")
-                    
-                    if changes:
-                        st.markdown("**Yapılan Kontroller ve İşlemler:**")
-                        change_log = ""
-                        for change in changes:
-                            change_log += f"- {change}\n"
-                        st.info(change_log)
-                    else:
-                        st.info("Sistem herhangi bir işlem raporlamadı.")
+                    if result.get('success'):
+                        product_name = result.get('product_name', sku_to_sync)
+                        changes = result.get('changes', [])
 
-                else:
-                    st.error(f"❌ Hata: {result.get('message')}")
+                        st.write("✅ Senkronizasyon tamamlandı.")
+
+                        if changes:
+                            st.markdown("---")
+                            st.markdown("**Yapılan İşlemler:**")
+                            for change in changes:
+                                st.write(f"- {change}")
+                        else:
+                            st.info("Sistem herhangi bir işlem raporlamadı.")
+
+                        status_container.update(label=f"✅ '{product_name}' başarıyla güncellendi", state="complete", expanded=False)
+                    else:
+                        st.write(f"❌ Hata: {result.get('message')}")
+                        status_container.update(label="❌ Senkronizasyon başarısız", state="error", expanded=True)
