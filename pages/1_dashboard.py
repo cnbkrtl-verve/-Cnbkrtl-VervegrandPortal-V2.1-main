@@ -296,14 +296,22 @@ with main_cols[0]:
                 # Son siparişler
                 recent_orders = shopify_stats.get('recent_orders', [])
                 if recent_orders:
-                    st.write("**Son Siparişler:**")
+                    st.markdown("#### 📦 Son Siparişler")
                     for order in recent_orders[:3]:
                         order_name = order.get('name', 'N/A')
                         order_total = order.get('totalPriceSet', {}).get('shopMoney', {})
+                        amount = order_total.get('amount', 0)
+                        currency = order_total.get('currencyCode', '')
                         customer = order.get('customer', {})
                         customer_name = f"{customer.get('firstName', '')} {customer.get('lastName', '')}".strip()
                         
-                        st.write(f"• {order_name} - {order_total.get('amount', 0)} {order_total.get('currencyCode', '')} ({customer_name})")
+                        with st.container(border=True):
+                            c1, c2 = st.columns([2, 1])
+                            with c1:
+                                st.markdown(f"**{order_name}**")
+                                st.caption(f"👤 {customer_name}" if customer_name else "👤 Misafir")
+                            with c2:
+                                st.markdown(f"<div style='text-align: right; color: #10b981; font-weight: 600;'>{amount} {currency}</div>", unsafe_allow_html=True)
                 
             except Exception as e:
                 st.error(f"Shopify verileri alınamadı: {str(e)}")
@@ -334,9 +342,15 @@ with main_cols[1]:
                 # Son güncellenen ürünler
                 recent_updates = sentos_stats.get('recent_updates', [])
                 if recent_updates:
-                    st.write("**Son Güncellenen Ürünler:**")
+                    st.markdown("#### 🔄 Son Güncellemeler")
                     for product in recent_updates[:3]:
-                        st.write(f"• {product.get('name', 'N/A')[:50]}...")
+                        product_name = product.get('name', 'N/A')
+                        with st.container(border=True):
+                            c1, c2 = st.columns([1, 6])
+                            with c1:
+                                st.markdown("📝")
+                            with c2:
+                                st.markdown(f"{product_name[:40]}{'...' if len(product_name) > 40 else ''}")
                 
             except Exception as e:
                 st.error(f"Sentos verileri alınamadı: {str(e)}")
