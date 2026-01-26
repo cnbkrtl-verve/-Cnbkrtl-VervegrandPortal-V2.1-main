@@ -5,3 +5,7 @@
 ## 2025-05-23 - Concise Status Badges
 **Learning:** Using `st.badge` for status indicators in lists (e.g., Payment Status) is much cleaner and more space-efficient than full-width alert components like `st.success` or `st.warning`. It keeps the visual flow of the list intact while still providing clear color-coded feedback.
 **Action:** Use `st.badge` for status columns in data grids or lists instead of alerts.
+
+## 2025-05-24 - Forms for Single Inputs
+**Learning:** `st.form` enables "Enter" key submission for single inputs, preventing accidental app reloads and improving keyboard workflow.
+**Action:** Use `st.form` for all single-input action triggers.
