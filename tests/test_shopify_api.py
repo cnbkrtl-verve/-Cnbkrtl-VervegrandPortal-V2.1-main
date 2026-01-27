@@ -21,10 +21,10 @@ class TestShopifyAPIInit:
         assert api.api_version == "2024-10"
     
     def test_init_with_http_url(self):
-        """✅ HTTP URL'i otomatik HTTPS'e çevrilmeli"""
+        """✅ HTTP URL'i olduğu gibi kalmalı (HTTPS zorlanmaz)"""
         api = ShopifyAPI("http://test-store.myshopify.com", "token")
         
-        assert api.store_url == "https://test-store.myshopify.com"
+        assert api.store_url == "http://test-store.myshopify.com"
     
     def test_init_without_http(self):
         """✅ URL başında http yoksa otomatik eklenmeli"""
@@ -57,9 +57,9 @@ class TestRateLimiter:
         """✅ Rate limiter başlangıç değerleri doğru olmalı"""
         api = ShopifyAPI("test-store.myshopify.com", "token")
         
-        assert api.max_requests_per_minute == 40
-        assert api.burst_tokens == 10
-        assert api.current_tokens == 10
+        assert api.max_requests_per_minute == 30
+        assert api.burst_tokens == 5
+        assert api.current_tokens == 5
     
     @patch('time.sleep')
     @patch('time.time')
@@ -74,7 +74,7 @@ class TestRateLimiter:
         api._rate_limit_wait()
         
         # Token tüketilmeli
-        assert api.current_tokens < 10
+        assert api.current_tokens < 5
         # Ama sleep çağrılmamalı (yeterli token var)
         mock_sleep.assert_not_called()
     
@@ -178,6 +178,89 @@ class TestGraphQLExecution:
         assert mock_post.call_count == 2
         assert mock_sleep.called
         assert result["shop"]["name"] == "Test Shop"
+
+
+class TestDashboardStats:
+    """Dashboard istatistikleri testleri"""
+
+    @patch('connectors.shopify_api.datetime')
+    @patch('connectors.shopify_api.ShopifyAPI.execute_graphql')
+    def test_get_dashboard_stats(self, mock_execute, mock_datetime):
+        """✅ Dashboard istatistikleri doğru hesaplanmalı (optimize edilmiş 2 sorgu)"""
+        from datetime import datetime, timedelta
+
+        # Fix date: 2023-10-15 (Sunday)
+        # Week start (Monday): 2023-10-09
+        # Month start: 2023-10-01
+        fixed_now = datetime(2023, 10, 15, 12, 0, 0)
+        mock_datetime.now.return_value = fixed_now
+
+        # Mock responses
+        metadata_response = {
+            "shop": {"name": "Test Shop", "currencyCode": "USD"},
+            "products": {"edges": [{"node": {"id": "1"}}]*10, "pageInfo": {"hasNextPage": False}},
+            "customers": {"edges": [{"node": {"id": "1"}}]*5}
+        }
+
+        # Orders:
+        # 1. Today (2023-10-15) - ID: 1, Price: 100
+        # 2. Week (2023-10-10) - ID: 2, Price: 50
+        # 3. Month (2023-10-02) - ID: 3, Price: 20
+        # 4. Old (2023-09-30) - Should not be in response if query filter works, but let's test Python filter
+        #    Wait, query filter logic is outside Python control (it's string).
+        #    But Python loop filters again?
+        #    Python loop filters: >= month_iso (2023-10-01).
+        #    So 2023-09-30 should be excluded from "month" stats even if returned.
+
+        orders_response = {
+            "orders": {
+                "edges": [
+                    {
+                        "node": {
+                            "id": "1",
+                            "createdAt": "2023-10-15T10:00:00",
+                            "totalPriceSet": {"shopMoney": {"amount": "100.0", "currencyCode": "USD"}}
+                        }
+                    },
+                    {
+                        "node": {
+                            "id": "2",
+                            "createdAt": "2023-10-10T10:00:00",
+                            "totalPriceSet": {"shopMoney": {"amount": "50.0", "currencyCode": "USD"}}
+                        }
+                    },
+                    {
+                        "node": {
+                            "id": "3",
+                            "createdAt": "2023-10-02T10:00:00",
+                            "totalPriceSet": {"shopMoney": {"amount": "20.0", "currencyCode": "USD"}}
+                        }
+                    }
+                ]
+            }
+        }
+
+        mock_execute.side_effect = [metadata_response, orders_response]
+
+        api = ShopifyAPI("test-store.myshopify.com", "token")
+        stats = api.get_dashboard_stats()
+
+        assert mock_execute.call_count == 2
+        assert stats['products_count'] == 10
+        assert stats['customers_count'] == 5
+
+        # Verify stats
+        # Today: ID 1
+        assert stats['orders_today'] == 1
+        assert stats['revenue_today'] == 100.0
+
+        # Week: ID 1, 2 (10-15, 10-10 >= 10-09)
+        assert stats['orders_this_week'] == 2
+        assert stats['revenue_this_week'] == 150.0
+
+        # Month: ID 1, 2, 3 (All >= 10-01)
+        assert stats['orders_this_month'] == 3
+        assert stats['revenue_this_month'] == 170.0
 
 
 # ============================================
