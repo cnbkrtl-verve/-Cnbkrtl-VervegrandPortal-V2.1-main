@@ -4,7 +4,7 @@ import requests
 import time
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any, Union
 from data_models import Order, Product, Customer
 
@@ -1327,8 +1327,9 @@ class ShopifyAPI:
         }
         
         try:
-            # Shop bilgileri
-            shop_query = """
+            # 1. Combined Metadata & Recent Orders Query
+            # This fetches Shop info, Product Count, and Recent Orders in ONE request
+            combined_query = """
             query {
               shop {
                 name
@@ -1338,131 +1339,110 @@ class ShopifyAPI:
                 plan { displayName }
                 billingAddress { country }
               }
-            }
-            """
-            shop_result = self.execute_graphql(shop_query)
-            if shop_result:
-                stats['shop_info'] = shop_result.get('shop', {})
-            
-            # Ürün sayısı - Shopify 2024-10 API uyumlu
-            products_query = """
-            query { 
               products(first: 250) { 
-                pageInfo { 
-                  hasNextPage 
-                } 
-                edges { 
-                  node { id } 
-                } 
-              } 
-            }
-            """
-            products_result = self.execute_graphql(products_query)
-            if products_result:
-                # İlk 250 ürünü say - daha fazla ürün varsa pageInfo.hasNextPage true olur
-                products_edges = products_result.get('products', {}).get('edges', [])
-                stats['products_count'] = len(products_edges)
-                
-                # Toplam ürün sayısı 250'den fazlaysa uyarı ekle
-                has_more = products_result.get('products', {}).get('pageInfo', {}).get('hasNextPage', False)
-                if has_more:
-                    stats['products_count_note'] = f"{stats['products_count']}+ (daha fazla ürün var)"
-            
-            # Müşteri sayısı
-            customers_query = """
-            query {
-              customers(first: 1) {
-                pageInfo {
-                  hasNextPage
-                }
+                pageInfo { hasNextPage }
+                edges { node { id } }
+              }
+              recentOrders: orders(first: 5, sortKey: CREATED_AT, reverse: true) {
                 edges {
-                  node { id }
+                  node {
+                    id
+                    name
+                    createdAt
+                    totalPriceSet { shopMoney { amount currencyCode } }
+                    customer { firstName lastName }
+                  }
                 }
               }
             }
             """
-            customers_result = self.execute_graphql(customers_query)
-            # Bu sadece tahmini bir sayım - gerçek sayı için analytics API gerekir
             
-            # Bugünkü siparişler
-            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            today_iso = today.isoformat()
-            tomorrow_iso = (today + timedelta(days=1)).isoformat()
+            combined_result = self.execute_graphql(combined_query)
             
-            orders_today_query = f"""
+            # Process combined result
+            if combined_result:
+                # Shop Info
+                stats['shop_info'] = combined_result.get('shop', {})
+
+                # Product Count
+                products_data = combined_result.get('products', {})
+                products_edges = products_data.get('edges', [])
+                stats['products_count'] = len(products_edges)
+                if products_data.get('pageInfo', {}).get('hasNextPage', False):
+                    stats['products_count_note'] = f"{stats['products_count']}+ (daha fazla ürün var)"
+
+                # Recent Orders
+                recent_orders_data = combined_result.get('recentOrders', {}).get('edges', [])
+                stats['recent_orders'] = [edge['node'] for edge in recent_orders_data]
+
+            # 2. Monthly Stats Query
+            # Fetch all orders for the month in ONE request and filter in Python
+            # This replaces 3 separate queries (Today, Week, Month)
+            
+            # Use UTC for consistency across servers and API
+            now_utc = datetime.now(timezone.utc)
+            today_utc = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+            month_start_utc = today_utc.replace(day=1)
+            week_start_utc = today_utc - timedelta(days=today_utc.weekday())
+            
+            # Calculate query start date (earliest of Month Start or Week Start)
+            # This ensures we get all orders for "This Week" even if it crosses month boundary
+            query_start_date = min(month_start_utc, week_start_utc)
+            query_start_iso = query_start_date.isoformat()
+
+            # Get orders for the period (up to 250)
+            month_orders_query = f"""
             query {{
-              orders(first: 50, query: "created_at:>='{today_iso}' AND created_at:<'{tomorrow_iso}'") {{
+              monthOrders: orders(first: 250, query: "created_at:>='{query_start_iso}'", sortKey: CREATED_AT, reverse: true) {{
                 edges {{
                   node {{
                     id
-                    name
                     createdAt
-                    totalPriceSet {{ shopMoney {{ amount currencyCode }} }}
-                    customer {{ firstName lastName }}
-                  }}
-                }}
-              }}
-            }}
-            """
-            orders_today_result = self.execute_graphql(orders_today_query)
-            if orders_today_result:
-                today_orders = orders_today_result.get('orders', {}).get('edges', [])
-                stats['orders_today'] = len(today_orders)
-                stats['revenue_today'] = sum(
-                    float(order['node'].get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-                    for order in today_orders
-                )
-                stats['recent_orders'] = [order['node'] for order in today_orders[:5]]
-            
-            # Bu haftaki siparişler
-            week_start = today - timedelta(days=today.weekday())
-            week_iso = week_start.isoformat()
-            
-            orders_week_query = f"""
-            query {{
-              orders(first: 250, query: "created_at:>='{week_iso}'") {{
-                edges {{
-                  node {{
-                    id
                     totalPriceSet {{ shopMoney {{ amount }} }}
                   }}
                 }}
               }}
             }}
             """
-            orders_week_result = self.execute_graphql(orders_week_query)
-            if orders_week_result:
-                week_orders = orders_week_result.get('orders', {}).get('edges', [])
-                stats['orders_this_week'] = len(week_orders)
-                stats['revenue_this_week'] = sum(
-                    float(order['node'].get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-                    for order in week_orders
-                )
             
-            # Bu ayki siparişler
-            month_start = today.replace(day=1)
-            month_iso = month_start.isoformat()
+            month_orders_result = self.execute_graphql(month_orders_query)
             
-            orders_month_query = f"""
-            query {{
-              orders(first: 250, query: "created_at:>='{month_iso}'") {{
-                edges {{
-                  node {{
-                    id
-                    totalPriceSet {{ shopMoney {{ amount }} }}
-                  }}
-                }}
-              }}
-            }}
-            """
-            orders_month_result = self.execute_graphql(orders_month_query)
-            if orders_month_result:
-                month_orders = orders_month_result.get('orders', {}).get('edges', [])
+            if month_orders_result:
+                all_month_orders = [
+                    edge['node'] for edge in
+                    month_orders_result.get('monthOrders', {}).get('edges', [])
+                ]
+
+                # Filter for Month Stats
+                # Since we query from min(week_start, month_start), we must filter for month_start
+                month_orders = [o for o in all_month_orders if datetime.fromisoformat(o['createdAt'].replace('Z', '+00:00')) >= month_start_utc]
                 stats['orders_this_month'] = len(month_orders)
                 stats['revenue_this_month'] = sum(
-                    float(order['node'].get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-                    for order in month_orders
+                    float(o.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+                    for o in month_orders
                 )
+
+                # Filter for Week Stats
+                # Note: We compare datetime objects in UTC.
+                # Shopify returns ISO strings with timezone (e.g. 2023-10-27T10:00:00Z)
+
+                for order in all_month_orders:
+                    try:
+                        # Parse as offset-aware (UTC)
+                        created_at_str = order['createdAt'].replace('Z', '+00:00')
+                        order_date_utc = datetime.fromisoformat(created_at_str)
+
+                        if order_date_utc >= week_start_utc:
+                            stats['orders_this_week'] += 1
+                            stats['revenue_this_week'] += float(order.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+
+                        if order_date_utc >= today_utc:
+                            stats['orders_today'] += 1
+                            stats['revenue_today'] += float(order.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+
+                    except Exception as parse_err:
+                        logging.warning(f"Date parsing error for order {order.get('id')}: {parse_err}")
+                        continue
             
             return stats
             
