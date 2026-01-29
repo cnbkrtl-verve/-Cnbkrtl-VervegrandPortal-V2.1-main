@@ -760,13 +760,24 @@ if st.session_state.calculated_df is not None:
     
     with extra_tab1:
         st.info("Belirli bir ürünün veya varyantın fiyatını manuel olarak güncelleyin.")
-        col_ex1, col_ex2 = st.columns(2)
+        with st.form(key="single_product_update_form", clear_on_submit=False):
+            col_ex1, col_ex2 = st.columns(2)
+
+            single_sku = col_ex1.text_input(
+                "Ürün SKU veya ID (gid://...)", placeholder="Örn: TSHIRT-001"
+            )
+            single_price = col_ex2.number_input(
+                "Yeni Fiyat (TL)", min_value=0.0, step=0.1
+            )
+            single_compare_price = col_ex2.number_input(
+                "İndirimsiz Fiyat (Opsiyonel)", min_value=0.0, step=0.1, value=0.0
+            )
+
+            submit_btn = st.form_submit_button(
+                "Tekil Güncelle", disabled=st.session_state.update_in_progress
+            )
         
-        single_sku = col_ex1.text_input("Ürün SKU veya ID (gid://...)", placeholder="Örn: TSHIRT-001")
-        single_price = col_ex2.number_input("Yeni Fiyat (TL)", min_value=0.0, step=0.1)
-        single_compare_price = col_ex2.number_input("İndirimsiz Fiyat (Opsiyonel)", min_value=0.0, step=0.1, value=0.0)
-        
-        if st.button("Tekil Güncelle", disabled=st.session_state.update_in_progress):
+        if submit_btn:
             if not single_sku or single_price <= 0:
                 st.error("Lütfen geçerli bir SKU ve fiyat girin.")
             else:
