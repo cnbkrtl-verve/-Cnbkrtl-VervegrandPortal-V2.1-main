@@ -214,28 +214,36 @@ if st.session_state.get("authentication_status"):
     row1_1, row1_2, row1_3, row1_4 = st.columns(4)
 
     with row1_1:
-        st.info("**📦 Ürün Transferi**")
-        st.caption("Shopify mağazalar arası ürün aktarımı yapın.")
-        if st.button("Transfer Başlat", key="btn_transfer", use_container_width=True):
-             st.switch_page("pages/13_Shopify_Magaza_Transferi.py")
+        with st.container(border=True):
+            st.markdown("##### :blue[📦 Ürün Transferi]")
+            st.caption("Shopify mağazalar arası ürün aktarımı yapın.")
+            if st.button("Transfer Başlat", key="btn_transfer",
+                         use_container_width=True):
+                st.switch_page("pages/13_Shopify_Magaza_Transferi.py")
 
     with row1_2:
-        st.success("**📊 Satış Analizi**")
-        st.caption("Detaylı satış ve karlılık raporlarını inceleyin.")
-        if st.button("Raporları Gör", key="btn_reports", use_container_width=True):
-             st.switch_page("pages/14_Satis_Analizi.py")
+        with st.container(border=True):
+            st.markdown("##### :green[📊 Satış Analizi]")
+            st.caption("Detaylı satış ve karlılık raporlarını inceleyin.")
+            if st.button("Raporları Gör", key="btn_reports",
+                         use_container_width=True):
+                st.switch_page("pages/14_Satis_Analizi.py")
 
     with row1_3:
-        st.warning("**🏷️ Metafield Yönetimi**")
-        st.caption("Ürünler için özel alanları ve filtreleri düzenleyin.")
-        if st.button("Metafield Düzenle", key="btn_metafield", use_container_width=True):
-             st.switch_page("pages/8_Metafield_Yonetimi.py")
+        with st.container(border=True):
+            st.markdown("##### :orange[🏷️ Metafield Yönetimi]")
+            st.caption("Ürünler için özel alanları ve filtreleri düzenleyin.")
+            if st.button("Metafield Düzenle", key="btn_metafield",
+                         use_container_width=True):
+                st.switch_page("pages/8_Metafield_Yonetimi.py")
 
     with row1_4:
-        st.error("**🖥️ Sistem İzleme**")
-        st.caption("Logları, API durumunu ve hataları kontrol edin.")
-        if st.button("Monitörü Aç", key="btn_monitor", use_container_width=True):
-             st.switch_page("pages/99_Sistem_Durumu.py")
+        with st.container(border=True):
+            st.markdown("##### :red[🖥️ Sistem İzleme]")
+            st.caption("Logları, API durumunu ve hataları kontrol edin.")
+            if st.button("Monitörü Aç", key="btn_monitor",
+                         use_container_width=True):
+                st.switch_page("pages/99_Sistem_Durumu.py")
 
     # Categories View
     st.markdown("### 📂 Modüller")
