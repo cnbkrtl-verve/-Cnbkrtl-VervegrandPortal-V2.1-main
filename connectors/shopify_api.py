@@ -13,7 +13,7 @@ class ShopifyAPI:
     def __init__(self, store_url: str, access_token: str, api_version: str = '2024-10'): # api_version parametresi burada ekli olmalı
         if not store_url: raise ValueError("Shopify Mağaza URL'si boş olamaz.")
         if not access_token: raise ValueError("Shopify Erişim Token'ı boş olamaz.")
-        
+
         self.store_url = store_url if store_url.startswith('http') else f"https://{store_url.strip()}"
         self.access_token = access_token
         self.api_version = api_version # Gelen versiyonu kullan
@@ -27,7 +27,7 @@ class ShopifyAPI:
         self.product_cache = {}
         self.location_id = None
         self.locations_cache = None  # Caching for get_locations
-        
+
         # ✅ Shopify 2024-10 Rate Limits (daha konservatif)
         # Shopify GraphQL Cost: 1000 points/sec, 50 cost avg/query = ~20 queries/sec max
         # Ancak burst'ü önlemek için daha düşük limit kullanıyoruz
@@ -47,36 +47,36 @@ class ShopifyAPI:
         - Burst protection
         """
         current_time = time.time()
-    
+
         # Token bucket: Her saniye token kazanılır
         elapsed = current_time - self.last_request_time
         tokens_to_add = elapsed * (self.max_requests_per_minute / 60.0)
         self.current_tokens = min(self.burst_tokens, self.current_tokens + tokens_to_add)
-    
+
         # Eğer yeterli token varsa, isteği yap
         if self.current_tokens >= 1:
             self.current_tokens -= 1
             self.last_request_time = current_time
             return
-    
+
         # Token yetersiz: Bekleme süresi hesapla
         wait_time = (1 - self.current_tokens) / (self.max_requests_per_minute / 60.0)
-        
+
         # ✅ Adaptive Throttling: Eğer sürekli bekleniyorsa, rate'i azalt
         if wait_time > 1.5:  # 2.0'dan 1.5'e düşürüldü (daha erken müdahale)
             wait_time = min(wait_time * 1.5, 8.0)  # Maksimum 8 saniye (5'ten 8'e çıkarıldı)
             logging.warning(f"⚠️ Adaptive throttling aktif: {wait_time:.2f}s bekleniyor")
-        
+
         time.sleep(wait_time)
         self.last_request_time = time.time()
         self.current_tokens = 0
-        
+
         # ✅ Bekleme sonrası debug log
         logging.debug(f"🔄 Rate limit beklendi: {wait_time:.2f}s | Tokens: {self.current_tokens:.1f}/{self.burst_tokens}")
 
     def _make_request(self, method, endpoint, data=None, is_graphql=False, headers=None, files=None):
         self._rate_limit_wait()
-        
+
         req_headers = headers if headers is not None else self.headers
         try:
             if not is_graphql and not endpoint.startswith('http'):
@@ -84,9 +84,9 @@ class ShopifyAPI:
                 url = f"{self.store_url}/admin/api/{self.rest_api_version}/{endpoint}"
             else:
                 url = endpoint if endpoint.startswith('http') else self.graphql_url
-            
-            response = requests.request(method, url, headers=req_headers, 
-                                        json=data if isinstance(data, dict) else None, 
+
+            response = requests.request(method, url, headers=req_headers,
+                                        json=data if isinstance(data, dict) else None,
                                         data=data if isinstance(data, bytes) else None,
                                         files=files, timeout=90)
             response.raise_for_status()
@@ -103,24 +103,24 @@ class ShopifyAPI:
         payload = {'query': query, 'variables': variables or {}}
         max_retries = 10  # 8'den 10'a çıkarıldı
         retry_delay = 3  # 2'den 3'e çıkarıldı (daha uzun bekleme)
-        
+
         # Debug için sorgu bilgilerini logla
         logging.debug(f"GraphQL Query: {query[:100]}...")
         if variables:
             logging.debug(f"GraphQL Variables: {json.dumps(variables, indent=2)[:200]}...")
-            
+
         for attempt in range(max_retries):
             try:
                 response = requests.post(self.graphql_url, headers=self.headers, json=payload, timeout=90)
                 response.raise_for_status()
                 response_data = response.json()
-                
+
                 if "errors" in response_data:
                     errors = response_data.get("errors", [])
-                    
+
                     # Throttling kontrolü
                     is_throttled = any(
-                        err.get('extensions', {}).get('code') == 'THROTTLED' 
+                        err.get('extensions', {}).get('code') == 'THROTTLED'
                         for err in errors
                     )
                     if is_throttled and attempt < max_retries - 1:
@@ -131,29 +131,29 @@ class ShopifyAPI:
                         # ✅ Token'ları sıfırla (rate limiter'ı da etkileyecek)
                         self.current_tokens = 0
                         continue
-                    
+
                     # Hata detaylarını logla
                     logging.error("GraphQL Hatası Detayları:")
                     logging.error(f"Query: {query}")
                     if variables:
                         logging.error(f"Variables: {json.dumps(variables, indent=2)}")
                     logging.error(f"Errors: {json.dumps(errors, indent=2)}")
-                    
+
                     # Hata mesajlarını topla
                     error_messages = []
                     for err in errors:
                         msg = err.get('message', 'Bilinmeyen GraphQL hatası')
                         locations = err.get('locations', [])
                         path = err.get('path', [])
-                        
+
                         error_detail = msg
                         if locations:
                             error_detail += f" (Satır: {locations[0].get('line', '?')})"
                         if path:
                             error_detail += f" (Alan: {'.'.join(map(str, path))})"
-                            
+
                         error_messages.append(error_detail)
-                    
+
                     raise Exception(f"GraphQL Error: {'; '.join(error_messages)}")
 
                 return response_data.get("data", {})
@@ -212,7 +212,7 @@ class ShopifyAPI:
             "email": customer_data.get('email'),
             "phone": customer_data.get('phone')
         }
-        
+
         # Adres bilgilerini ekle (defaultAddress veya addresses)
         default_address = customer_data.get('defaultAddress')
         if default_address:
@@ -233,7 +233,7 @@ class ShopifyAPI:
             address_input = {k: v for k, v in address_input.items() if v}
             if address_input:
                 input_data["addresses"] = [address_input]
-        
+
         result = self.execute_graphql(mutation, {"input": input_data})
         if errors := result.get('customerCreate', {}).get('userErrors', []):
             raise Exception(f"Müşteri oluşturma hatası: {errors}")
@@ -272,7 +272,7 @@ class ShopifyAPI:
                 displayFulfillmentStatus
                 note
                 tags
-                customer { 
+                customer {
                   id
                   firstName
                   lastName
@@ -296,10 +296,10 @@ class ShopifyAPI:
                     phone
                   }
                 }
-                
+
                 # Ödeme yöntemi (gateway names)
                 paymentGatewayNames
-                
+
                 # Kargo bilgileri
                 shippingLine {
                   title
@@ -307,7 +307,7 @@ class ShopifyAPI:
                   source
                   originalPriceSet { shopMoney { amount currencyCode } }
                 }
-                
+
                 # İndirim uygulamaları
                 discountApplications(first: 10) {
                   edges {
@@ -340,13 +340,13 @@ class ShopifyAPI:
                     }
                   }
                 }
-                
+
                 # Özel alanlar
                 customAttributes {
                   key
                   value
                 }
-                
+
                 currentSubtotalPriceSet { shopMoney { amount currencyCode } }
                 currentTotalPriceSet { shopMoney { amount currencyCode } }
                 totalPriceSet { shopMoney { amount currencyCode } }
@@ -360,10 +360,10 @@ class ShopifyAPI:
                     id
                     title
                     quantity
-                    variant { 
+                    variant {
                       id
                       sku
-                      title 
+                      title
                     }
                     originalUnitPriceSet { shopMoney { amount currencyCode } }
                     discountedUnitPriceSet { shopMoney { amount currencyCode } }
@@ -380,14 +380,14 @@ class ShopifyAPI:
                     }
                   }
                 }
-                
+
                 # Siparişin genel vergi dökümü
                 taxLines {
                   priceSet { shopMoney { amount, currencyCode } }
                   ratePercentage
                   title
                 }
-                
+
                 shippingAddress {
                   name
                   address1
@@ -401,7 +401,7 @@ class ShopifyAPI:
                   phone
                   company
                 }
-                
+
                 billingAddress {
                   name
                   firstName
@@ -423,17 +423,17 @@ class ShopifyAPI:
         }
         """
         variables = {"cursor": None, "filter_query": f"created_at:>='{start_date_iso}' AND created_at:<='{end_date_iso}'"}
-        
+
         while True:
             data = self.execute_graphql(query, variables)
             if not data: break
             orders_data = data.get("orders", {})
             for edge in orders_data.get("edges", []):
                 all_orders.append(edge["node"])
-            
+
             page_info = orders_data.get("pageInfo", {})
             if not page_info.get("hasNextPage"): break
-            
+
             variables["cursor"] = page_info["endCursor"]
             time.sleep(1)
 
@@ -444,9 +444,9 @@ class ShopifyAPI:
         # Gönderilen line item sayısını kaydet (doğrulama için)
         input_line_items_count = len(order_input.get('lineItems', []))
         input_total_quantity = sum(item.get('quantity', 0) for item in order_input.get('lineItems', []))
-        
+
         logging.info(f"📦 Sipariş oluşturuluyor: {input_line_items_count} adet ürün modeli, toplam {input_total_quantity} adet")
-        
+
         # Shopify'ın güncel API'sine göre doğru type: OrderCreateOrderInput!
         mutation = """
         mutation orderCreate($order: OrderCreateOrderInput!) {
@@ -490,22 +490,22 @@ class ShopifyAPI:
         """
         # Doğru variable name ve type ile GraphQL çağrısı
         result = self.execute_graphql(mutation, {"order": order_input})
-        
+
         if errors := result.get('orderCreate', {}).get('userErrors', []):
             error_messages = [f"{error.get('field', 'Genel')}: {error.get('message', 'Bilinmeyen hata')}" for error in errors]
             raise Exception(f"Sipariş oluşturma hatası: {'; '.join(error_messages)}")
-            
+
         order = result.get('orderCreate', {}).get('order', {})
         if not order:
             raise Exception("Sipariş oluşturuldu ancak sipariş bilgileri alınamadı")
-        
+
         # ✅ KRİTİK DOĞRULAMA: Oluşturulan siparişte tüm ürünler var mı kontrol et
         created_line_items = order.get('lineItems', {}).get('edges', [])
         created_items_count = len(created_line_items)
         created_total_quantity = sum(edge['node'].get('quantity', 0) for edge in created_line_items)
-        
+
         logging.info(f"✅ Sipariş oluşturuldu: {created_items_count} adet ürün modeli, toplam {created_total_quantity} adet")
-        
+
         # Eğer oluşturulan ürün sayısı gönderilenden azsa HATA ver
         if created_items_count < input_line_items_count:
             missing_count = input_line_items_count - created_items_count
@@ -519,7 +519,7 @@ class ShopifyAPI:
             )
             logging.error(error_msg)
             raise Exception(error_msg)
-        
+
         # Miktar kontrolü de yap
         if created_total_quantity < input_total_quantity:
             missing_qty = input_total_quantity - created_total_quantity
@@ -533,10 +533,10 @@ class ShopifyAPI:
             )
             logging.error(error_msg)
             raise Exception(error_msg)
-        
+
         logging.info(f"✅ DOĞRULAMA BAŞARILI: Tüm ürünler eksiksiz aktarıldı ({created_items_count}/{input_line_items_count} model, {created_total_quantity}/{input_total_quantity} adet)")
-            
-        return order  
+
+        return order
 
     def get_locations(self):
         if self.locations_cache:
@@ -617,27 +617,27 @@ class ShopifyAPI:
         }
         """
         variables = {"id": collection_id, "cursor": None}
-        
+
         while True:
             if progress_callback:
                 progress_callback(f"Koleksiyon ürünleri çekiliyor... {len(all_products)} ürün alındı.")
-                
+
             data = self.execute_graphql(query, variables)
             collection_data = data.get("collection", {})
-            
+
             if not collection_data:
                 logging.warning(f"Koleksiyon bulunamadı veya boş: {collection_id}")
                 break
-                
+
             products_data = collection_data.get("products", {})
             for edge in products_data.get("edges", []):
                 all_products.append(edge["node"])
-                
+
             if not products_data.get("pageInfo", {}).get("hasNextPage"):
                 break
-                
+
             variables["cursor"] = products_data["pageInfo"]["endCursor"]
-            
+
         logging.info(f"Koleksiyon {collection_id} içinden {len(all_products)} ürün çekildi.")
         return all_products
 
@@ -693,17 +693,17 @@ class ShopifyAPI:
         if not skus: return {}
         sanitized_skus = [str(sku).strip() for sku in skus if sku]
         if not sanitized_skus: return {}
-        
+
         logging.info(f"{len(sanitized_skus)} adet SKU için varyant ID'leri aranıyor (Mod: {'Ürün Bazlı' if search_by_product_sku else 'Varyant Bazlı'})...")
         sku_map = {}
-        
+
         # KRITIK: Batch boyutunu 2'ye düşür
         batch_size = 2
-        
+
         for i in range(0, len(sanitized_skus), batch_size):
             sku_chunk = sanitized_skus[i:i + batch_size]
             query_filter = " OR ".join([f"sku:{json.dumps(sku)}" for sku in sku_chunk])
-            
+
             query = """
             query getProductsBySku($query: String!) {
               products(first: 10, query: $query) {
@@ -712,9 +712,9 @@ class ShopifyAPI:
                     id
                     variants(first: 50) {
                       edges {
-                        node { 
+                        node {
                           id
-                          sku 
+                          sku
                         }
                       }
                     }
@@ -739,12 +739,12 @@ class ShopifyAPI:
                                 "variant_id": node["id"],
                                 "product_id": product_id
                             }
-                
+
                 # KRITIK: Her batch sonrası uzun bekleme
                 if i + batch_size < len(sanitized_skus):
                     logging.info(f"Batch {i//batch_size+1} tamamlandı, rate limit için 3 saniye bekleniyor...")
                     time.sleep(3)
-            
+
             except Exception as e:
                 logging.error(f"SKU grubu {i//batch_size+1} için varyant ID'leri alınırken hata: {e}")
                 # Hata durumunda da biraz bekle
@@ -918,7 +918,7 @@ class ShopifyAPI:
     def load_all_products_for_cache(self, progress_callback=None):
         """GraphQL ile tüm ürünleri önbelleğe al"""
         total_loaded = 0
-        
+
         query = """
         query getProductsForCache($cursor: String) {
           products(first: 50, after: $cursor) {
@@ -947,24 +947,24 @@ class ShopifyAPI:
           }
         }
         """
-        
+
         variables = {"cursor": None}
-        
+
         while True:
-            if progress_callback: 
+            if progress_callback:
                 progress_callback({'message': f"Shopify ürünleri önbelleğe alınıyor... {total_loaded} ürün bulundu."})
-            
+
             try:
                 data = self.execute_graphql(query, variables)
                 products_data = data.get("products", {})
-                
+
                 for edge in products_data.get("edges", []):
                     product = edge["node"]
                     # GID'den sadece ID'yi çıkar
                     product_id = product["id"].split("/")[-1]
                     product_title = product.get('title', '')
                     product_description = product.get('description', '')
-                    
+
                     # Varyantları dönüştür
                     variants = []
                     for variant_edge in product.get('variants', {}).get('edges', []):
@@ -978,48 +978,48 @@ class ShopifyAPI:
                             'sku': sku,
                             'options': options
                         })
-                    
+
                     product_data = {
-                        'id': int(product_id), 
+                        'id': int(product_id),
                         'gid': product["id"],
                         'title': product_title,
                         'description': product_description,
                         'variants': variants
                     }
-                    
+
                     # Title ile önbelleğe al
-                    if title := product.get('title'): 
+                    if title := product.get('title'):
                         self.product_cache[f"title:{title.strip()}"] = product_data
-                    
+
                     # Variants ile önbelleğe al
                     for variant in variants:
-                        if sku := variant.get('sku'): 
+                        if sku := variant.get('sku'):
                             self.product_cache[f"sku:{sku.strip()}"] = product_data
-                
+
                 total_loaded += len(products_data.get("edges", []))
-                
+
                 # Sayfalama kontrolü
                 page_info = products_data.get("pageInfo", {})
                 if not page_info.get("hasNextPage"):
                     break
-                
+
                 variables["cursor"] = page_info["endCursor"]
                 time.sleep(0.5)  # Rate limit koruması
-                
+
             except Exception as e:
                 logging.error(f"Ürünler önbelleğe alınırken hata: {e}")
                 break
-        
+
         logging.info(f"Shopify'dan toplam {total_loaded} ürün önbelleğe alındı.")
         return total_loaded
-    
+
     def delete_product_media(self, product_id, media_ids):
         """Ürün medyalarını siler"""
-        if not media_ids: 
+        if not media_ids:
             return
-            
+
         logging.info(f"Ürün GID: {product_id} için {len(media_ids)} medya siliniyor...")
-        
+
         query = """
         mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
             productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
@@ -1032,12 +1032,12 @@ class ShopifyAPI:
             result = self.execute_graphql(query, {'productId': product_id, 'mediaIds': media_ids})
             deleted_ids = result.get('productDeleteMedia', {}).get('deletedMediaIds', [])
             errors = result.get('productDeleteMedia', {}).get('userErrors', [])
-            
-            if errors: 
+
+            if errors:
                 logging.warning(f"Medya silme hataları: {errors}")
-            
+
             logging.info(f"{len(deleted_ids)} medya başarıyla silindi.")
-            
+
         except Exception as e:
             logging.error(f"Medya silinirken kritik hata oluştu: {e}")
 
@@ -1048,9 +1048,9 @@ class ShopifyAPI:
             return
 
         moves = [{"id": media_id, "newPosition": str(i)} for i, media_id in enumerate(media_ids)]
-        
+
         logging.info(f"Ürün {product_id} için {len(moves)} medya yeniden sıralama işlemi gönderiliyor...")
-        
+
         query = """
         mutation productReorderMedia($id: ID!, $moves: [MoveInput!]!) {
           productReorderMedia(id: $id, moves: $moves) {
@@ -1063,13 +1063,13 @@ class ShopifyAPI:
         """
         try:
             result = self.execute_graphql(query, {'id': product_id, 'moves': moves})
-            
+
             errors = result.get('productReorderMedia', {}).get('userErrors', [])
             if errors:
                 logging.warning(f"Medya yeniden sıralama hataları: {errors}")
             else:
                 logging.info("✅ Medya yeniden sıralama işlemi başarıyla gönderildi.")
-                
+
         except Exception as e:
             logging.error(f"Medya yeniden sıralanırken kritik hata: {e}")
 
@@ -1097,7 +1097,7 @@ class ShopifyAPI:
             result = self.execute_graphql(query)
             shop_data = result.get('shop', {})
             products_data = result.get('products', {}).get('edges', [])
-            
+
             return {
                 'success': True,
                 'name': shop_data.get('name'),
@@ -1140,11 +1140,11 @@ class ShopifyAPI:
         }
         """
         variables = {"id": collection_id, "cursor": None}
-        
+
         while True:
             logging.info(f"Koleksiyon ürünleri çekiliyor... Cursor: {variables['cursor']}")
             data = self.execute_graphql(query, variables)
-            
+
             collection_data = data.get("collection")
             if not collection_data:
                 logging.error(f"Koleksiyon {collection_id} bulunamadı veya veri alınamadı.")
@@ -1153,23 +1153,23 @@ class ShopifyAPI:
             products_data = collection_data.get("products", {})
             for edge in products_data.get("edges", []):
                 all_products.append(edge["node"])
-            
+
             page_info = products_data.get("pageInfo", {})
             if not page_info.get("hasNextPage"):
                 break
-            
+
             variables["cursor"] = page_info["endCursor"]
             time.sleep(0.5) # Rate limit için küçük bir bekleme
 
         logging.info(f"Koleksiyon için toplam {len(all_products)} ürün ve stok bilgisi çekildi.")
-        return all_products        
-        
+        return all_products
+
     def update_product_metafield(self, product_gid, namespace, key, value):
         """
         Bir ürünün belirli bir tamsayı (integer) metafield'ını günceller.
         """
         logging.info(f"Metafield güncelleniyor: Ürün GID: {product_gid}, {namespace}.{key} = {value}")
-        
+
         # ✅ 2024-10 API FIX: productUpdate mutation ProductInput kullanıyor (ProductUpdateInput DEĞİL!)
         mutation = """
         mutation productUpdate($input: ProductInput!, $namespace: String!, $key: String!) {
@@ -1187,7 +1187,7 @@ class ShopifyAPI:
           }
         }
         """
-        
+
         variables = {
           "input": {
             "id": product_gid,
@@ -1210,16 +1210,16 @@ class ShopifyAPI:
                 error_message = f"Metafield güncelleme hatası: {errors}"
                 logging.error(error_message)
                 return {'success': False, 'reason': error_message}
-            
+
             updated_value = result.get('productUpdate', {}).get('product', {}).get('metafield', {}).get('value')
             logging.info(f"✅ Metafield başarıyla güncellendi. Yeni değer: {updated_value}")
             return {'success': True, 'new_value': updated_value}
-        
+
         except Exception as e:
             error_message = f"Metafield güncellenirken kritik hata: {e}"
             logging.error(error_message)
             return {'success': False, 'reason': str(e)}
-        
+
     def create_product_sortable_metafield_definition(self, method='modern'):
         """
         Metafield tanımını, seçilen metoda (modern, legacy, hybrid) göre oluşturur.
@@ -1259,7 +1259,7 @@ class ShopifyAPI:
         elif method == 'hybrid':
             base_definition["capabilities"] = {"sortable": True}
             base_definition["sortable"] = True
-        
+
         variables = {"definition": base_definition}
 
         try:
@@ -1277,7 +1277,7 @@ class ShopifyAPI:
 
         except Exception as e:
             return {'success': False, 'message': f"Kritik API hatası: {e}"}
-        
+
     def get_collection_available_sort_keys(self, collection_gid):
         """
         Belirli bir koleksiyon için mevcut olan sıralama anahtarlarını
@@ -1301,16 +1301,16 @@ class ShopifyAPI:
             collection_data = result.get('collection', {})
             if not collection_data:
                 return {'success': False, 'message': 'Koleksiyon bulunamadı.'}
-            
+
             sort_keys = collection_data.get('availableSortKeys', [])
             return {'success': True, 'data': sort_keys}
         except Exception as e:
             return {'success': False, 'message': str(e)}
 
     # ========== DASHBOARD İÇİN YENİ METODLAR ==========
-    
+
     def get_dashboard_stats(self):
-        """Dashboard için detaylı istatistikleri getir"""
+        """Dashboard için detaylı istatistikleri getir - Optimize Edilmiş (2 Request)"""
         stats = {
             'shop_info': {},
             'orders_today': 0,
@@ -1325,10 +1325,11 @@ class ShopifyAPI:
             'top_products': [],
             'low_stock_products': []
         }
-        
+
         try:
-            # Shop bilgileri
-            shop_query = """
+            # 1. Metadata Query (Shop + Products Count)
+            # Combine Shop info and Products count into one query
+            metadata_query = """
             query {
               shop {
                 name
@@ -1338,40 +1339,7 @@ class ShopifyAPI:
                 plan { displayName }
                 billingAddress { country }
               }
-            }
-            """
-            shop_result = self.execute_graphql(shop_query)
-            if shop_result:
-                stats['shop_info'] = shop_result.get('shop', {})
-            
-            # Ürün sayısı - Shopify 2024-10 API uyumlu
-            products_query = """
-            query { 
-              products(first: 250) { 
-                pageInfo { 
-                  hasNextPage 
-                } 
-                edges { 
-                  node { id } 
-                } 
-              } 
-            }
-            """
-            products_result = self.execute_graphql(products_query)
-            if products_result:
-                # İlk 250 ürünü say - daha fazla ürün varsa pageInfo.hasNextPage true olur
-                products_edges = products_result.get('products', {}).get('edges', [])
-                stats['products_count'] = len(products_edges)
-                
-                # Toplam ürün sayısı 250'den fazlaysa uyarı ekle
-                has_more = products_result.get('products', {}).get('pageInfo', {}).get('hasNextPage', False)
-                if has_more:
-                    stats['products_count_note'] = f"{stats['products_count']}+ (daha fazla ürün var)"
-            
-            # Müşteri sayısı
-            customers_query = """
-            query {
-              customers(first: 1) {
+              products(first: 250) {
                 pageInfo {
                   hasNextPage
                 }
@@ -1381,17 +1349,34 @@ class ShopifyAPI:
               }
             }
             """
-            customers_result = self.execute_graphql(customers_query)
-            # Bu sadece tahmini bir sayım - gerçek sayı için analytics API gerekir
-            
-            # Bugünkü siparişler
+            metadata_result = self.execute_graphql(metadata_query)
+
+            if metadata_result:
+                stats['shop_info'] = metadata_result.get('shop', {})
+
+                products_edges = metadata_result.get('products', {}).get('edges', [])
+                stats['products_count'] = len(products_edges)
+
+                has_more = metadata_result.get('products', {}).get('pageInfo', {}).get('hasNextPage', False)
+                if has_more:
+                    stats['products_count_note'] = f"{stats['products_count']}+ (daha fazla ürün var)"
+
+            # 2. Consolidated Orders Query
+            # Fetch orders from the start of the month (or week/today if they are earlier, usually month is earliest)
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            today_iso = today.isoformat()
-            tomorrow_iso = (today + timedelta(days=1)).isoformat()
-            
-            orders_today_query = f"""
+            week_start = today - timedelta(days=today.weekday())
+            month_start = today.replace(day=1)
+
+            # Use the earliest date to ensure we get all relevant orders
+            # Usually month_start <= week_start <= today, but near start of month, week_start could be in previous month
+            min_date = min(month_start, week_start)
+            min_date_iso = min_date.isoformat()
+
+            # Fetch last 250 orders since min_date
+            # We fetch all fields needed for "Today" view (name, customer, etc.)
+            orders_query = f"""
             query {{
-              orders(first: 50, query: "created_at:>='{today_iso}' AND created_at:<'{tomorrow_iso}'") {{
+              orders(first: 250, query: "created_at:>='{min_date_iso}'", sortKey: CREATED_AT, reverse: true) {{
                 edges {{
                   node {{
                     id
@@ -1404,68 +1389,55 @@ class ShopifyAPI:
               }}
             }}
             """
-            orders_today_result = self.execute_graphql(orders_today_query)
-            if orders_today_result:
-                today_orders = orders_today_result.get('orders', {}).get('edges', [])
+
+            orders_result = self.execute_graphql(orders_query)
+
+            if orders_result:
+                all_orders = [edge['node'] for edge in orders_result.get('orders', {}).get('edges', [])]
+
+                # Filter orders into buckets in Python
+                today_orders = []
+                week_orders = []
+                month_orders = []
+
+                today_iso = today.isoformat()
+                week_iso = week_start.isoformat()
+                month_iso = month_start.isoformat()
+
+                for order in all_orders:
+                    created_at = order.get('createdAt', '')
+                    # Check buckets
+                    if created_at >= today_iso:
+                        today_orders.append(order)
+                    if created_at >= week_iso:
+                        week_orders.append(order)
+                    if created_at >= month_iso:
+                        month_orders.append(order)
+
+                # Aggregate stats
                 stats['orders_today'] = len(today_orders)
                 stats['revenue_today'] = sum(
-                    float(order['node'].get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-                    for order in today_orders
+                    float(o.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+                    for o in today_orders
                 )
-                stats['recent_orders'] = [order['node'] for order in today_orders[:5]]
-            
-            # Bu haftaki siparişler
-            week_start = today - timedelta(days=today.weekday())
-            week_iso = week_start.isoformat()
-            
-            orders_week_query = f"""
-            query {{
-              orders(first: 250, query: "created_at:>='{week_iso}'") {{
-                edges {{
-                  node {{
-                    id
-                    totalPriceSet {{ shopMoney {{ amount }} }}
-                  }}
-                }}
-              }}
-            }}
-            """
-            orders_week_result = self.execute_graphql(orders_week_query)
-            if orders_week_result:
-                week_orders = orders_week_result.get('orders', {}).get('edges', [])
+
                 stats['orders_this_week'] = len(week_orders)
                 stats['revenue_this_week'] = sum(
-                    float(order['node'].get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-                    for order in week_orders
+                    float(o.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+                    for o in week_orders
                 )
-            
-            # Bu ayki siparişler
-            month_start = today.replace(day=1)
-            month_iso = month_start.isoformat()
-            
-            orders_month_query = f"""
-            query {{
-              orders(first: 250, query: "created_at:>='{month_iso}'") {{
-                edges {{
-                  node {{
-                    id
-                    totalPriceSet {{ shopMoney {{ amount }} }}
-                  }}
-                }}
-              }}
-            }}
-            """
-            orders_month_result = self.execute_graphql(orders_month_query)
-            if orders_month_result:
-                month_orders = orders_month_result.get('orders', {}).get('edges', [])
+
                 stats['orders_this_month'] = len(month_orders)
                 stats['revenue_this_month'] = sum(
-                    float(order['node'].get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
-                    for order in month_orders
+                    float(o.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0))
+                    for o in month_orders
                 )
-            
+
+                # Recent orders: Top 5 from today
+                stats['recent_orders'] = today_orders[:5]
+
             return stats
-            
+
         except Exception as e:
             logging.error(f"Dashboard istatistikleri alınırken hata: {e}")
             return stats
@@ -1474,23 +1446,23 @@ class ShopifyAPI:
         """
         🎯 SADECE SEO için ürün resimlerinin ALT text'ini SEO dostu formatta günceller.
         HİÇBİR RESİM EKLEME/SİLME/YENİDEN SIRALAMA YAPMAZ.
-        
+
         ALT Text Formatı (Shopify Admin'de "Ad" olarak görünür):
         - 1. resim: Buyuk-Beden-Uzun-Kollu-Leopar-Desenli-Diz-Ustu-Elbise-285058-a
         - 2. resim: Buyuk-Beden-Uzun-Kollu-Leopar-Desenli-Diz-Ustu-Elbise-285058-b
         - 3. resim: Buyuk-Beden-Uzun-Kollu-Leopar-Desenli-Diz-Ustu-Elbise-285058-c
         - vb...
-        
+
         Özellikler:
         - Türkçe karakterler İngilizce'ye çevrilir (ı→i, ğ→g, ü→u, ş→s, ö→o, ç→c)
         - Boşluklar tire (-) ile değiştirilir
         - Her resim sıralı harf eki alır (a, b, c, d, e...)
         - İlk harfler büyük kalır (SEO için)
-        
+
         Args:
             product_gid: Ürünün Shopify Global ID'si (gid://shopify/Product/123)
             product_title: Ürün başlığı
-            
+
         Returns:
             dict: {'success': bool, 'updated_count': int, 'message': str}
         """
@@ -1519,39 +1491,39 @@ class ShopifyAPI:
             """
             result = self.execute_graphql(query, {"id": product_gid})
             media_edges = result.get("product", {}).get("media", {}).get("edges", [])
-            
+
             if not media_edges:
                 return {
                     'success': True,
                     'updated_count': 0,
                     'message': 'Güncellenecek resim bulunamadı'
                 }
-            
+
             # 2. SEO dostu base filename oluştur (Türkçe karakterler temizlenir, boşluklar tire)
             # Örnek: "Büyük Beden Kısa Kollu Bisiklet Yaka Baskılı T-shirt 303734"
             # Sonuç: "Buyuk-Beden-Kisa-Kollu-Bisiklet-Yaka-Baskili-T-shirt-303734"
             base_filename = self._create_seo_filename_with_dashes(product_title)
-            
+
             # 3. Her resim için ALT text ve filename güncelle
             updated_count = 0
             alphabet = 'abcdefghijklmnopqrstuvwxyz'  # Sıralı harf ekleri için
-            
+
             for idx, edge in enumerate(media_edges):
                 node = edge.get('node', {})
                 media_id = node.get('id')
                 media_type = node.get('mediaContentType')
-                
+
                 if media_type != 'IMAGE':
                     continue
-                
+
                 # Harf eki (a, b, c, d, e...)
                 letter_suffix = alphabet[idx] if idx < len(alphabet) else f"z{idx - 25}"
-                
+
                 # ✅ ÇÖZÜM: Shopify Admin'deki "Ad" kısmı = ALT field
                 # ALT text'i filename formatında yapıyoruz
                 # Örnek: Buyuk-Beden-Uzun-Kollu-Leopar-Desenli-Diz-Ustu-Elbise-285058-a
                 new_alt_with_filename = f"{base_filename}-{letter_suffix}"
-                
+
                 # 4. Medya güncelle
                 mutation = """
                 mutation updateMedia($media: [UpdateMediaInput!]!, $productId: ID!) {
@@ -1567,12 +1539,12 @@ class ShopifyAPI:
                     }
                 }
                 """
-                
+
                 media_input = [{
                     "id": media_id,
                     "alt": new_alt_with_filename  # ✅ ALT = FILENAME FORMATI (Buyuk-Beden-Elbise-285058-a)
                 }]
-                
+
                 update_result = self.execute_graphql(
                     mutation,
                     {
@@ -1580,7 +1552,7 @@ class ShopifyAPI:
                         "productId": product_gid
                     }
                 )
-                
+
                 errors = update_result.get('productUpdateMedia', {}).get('mediaUserErrors', [])
                 if errors:
                     logging.error(f"  ❌ Resim {idx + 1} güncelleme hatası: {errors}")
@@ -1588,16 +1560,16 @@ class ShopifyAPI:
                     updated_count += 1
                     logging.info(f"  ✅ Resim {idx + 1}/{len(media_edges)}: ALT='{new_alt_with_filename}'")
 
-                
+
                 # Rate limit koruması
                 time.sleep(0.3)
-            
+
             return {
                 'success': True,
                 'updated_count': updated_count,
                 'message': f'{updated_count}/{len(media_edges)} resim SEO formatında güncellendi (tire ile)'
             }
-            
+
         except Exception as e:
             logging.error(f"SEO media güncelleme hatası: {e}")
             return {
@@ -1605,7 +1577,7 @@ class ShopifyAPI:
                 'updated_count': 0,
                 'message': f'Hata: {str(e)}'
             }
-    
+
     def _create_seo_filename_with_dashes(self, title):
         """
         Ürün başlığından SEO dostu dosya adı oluşturur - TIRE İLE.
@@ -1613,36 +1585,36 @@ class ShopifyAPI:
         Örnek: "Büyük Beden T-shirt 303734" -> "Buyuk-Beden-T-shirt-303734"
         """
         import re
-        
+
         # Türkçe karakterleri İngilizce karşılıklarına çevir (BÜYÜK/küçük harf korunur)
         tr_map = str.maketrans({
             'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
             'İ': 'I', 'Ğ': 'G', 'Ü': 'U', 'Ş': 'S', 'Ö': 'O', 'Ç': 'C'
         })
-        
+
         filename = title.translate(tr_map)
-        
+
         # Özel karakterleri kaldır, sadece harf, rakam, boşluk ve tire bırak
         filename = re.sub(r'[^a-zA-Z0-9\s-]', '', filename)
-        
+
         # Birden fazla boşluğu tek boşluğa çevir
         filename = re.sub(r'\s+', ' ', filename.strip())
-        
+
         # Boşlukları tire ile değiştir
         filename = filename.replace(' ', '-')
-        
+
         # Birden fazla tireyi tek tire yap
         filename = re.sub(r'-+', '-', filename)
-        
+
         return filename.strip('-')
 
     def get_product_recommendations(self, product_gid: str) -> dict:
         """
         Shopify'ın önerdiği kategori ve meta alanları getirir.
-        
+
         Args:
             product_gid: Ürün GID (gid://shopify/Product/123456)
-            
+
         Returns:
             dict: {
                 'suggested_category': {...},  # Önerilen kategori bilgisi
@@ -1683,10 +1655,10 @@ class ShopifyAPI:
                 }
             }
             """
-            
+
             result = self.execute_graphql(query, {"id": product_gid})
             product = result.get('product', {})
-            
+
             if not product:
                 return {
                     'suggested_category': None,
@@ -1694,13 +1666,13 @@ class ShopifyAPI:
                     'current_category': None,
                     'title': ''
                 }
-            
+
             title = product.get('title', '')
             current_category = product.get('category')
-            
+
             # 2. Title'dan anahtar kelimeleri çıkar ve kategori ara
             suggested_category = None
-            
+
             # Basit anahtar kelime eşleştirmesi (T-shirt, Blouse, Dress vb.)
             # GÜNCELLENME: Shopify'ın GERÇEK taxonomy ID'leri kullanıldı!
             category_keywords = {
@@ -1731,12 +1703,12 @@ class ShopifyAPI:
                 'tunic': 'aa-1-13-11',      # Apparel > Clothing > Clothing Tops > Tunics
                 'tunik': 'aa-1-13-11',
             }
-            
+
             # Title'ı küçük harfe çevir ve ara
             title_lower = title.lower()
             suggested_taxonomy_id = None
             category_full_name = None
-            
+
             for keyword, category_id in category_keywords.items():
                 if keyword in title_lower:
                     suggested_taxonomy_id = category_id
@@ -1760,7 +1732,7 @@ class ShopifyAPI:
                     category_full_name = category_names.get(category_id, f'Category {category_id}')
                     logging.info(f"🎯 Önerilen kategori bulundu: {category_full_name} ('{keyword}' kelimesinden)")
                     break
-            
+
             # Suggested category oluştur (taxonomyCategory query yapmadan)
             if suggested_taxonomy_id:
                 suggested_category = {
@@ -1769,7 +1741,7 @@ class ShopifyAPI:
                     'fullName': category_full_name,
                     'name': category_full_name.split(' > ')[-1] if category_full_name else ''
                 }
-            
+
             # Önerilen attribute'leri topla
             # NOT: Mevcut category'den attribute'leri alıyoruz (eğer varsa)
             recommended_attrs = []
@@ -1781,14 +1753,14 @@ class ShopifyAPI:
                     # TaxonomyAttribute'da sadece 'id' var, o yüzden name varsa ekle
                     if attr.get('name'):
                         recommended_attrs.append(attr['name'])
-            
+
             return {
                 'suggested_category': suggested_category,
                 'recommended_attributes': recommended_attrs,
                 'current_category': current_category,
                 'title': title
             }
-            
+
         except Exception as e:
             logging.error(f"Ürün önerileri alınamadı: {e}")
             import traceback
@@ -1799,19 +1771,19 @@ class ShopifyAPI:
                 'current_category': None,
                 'title': ''
             }
-    
+
     def update_product_category_and_metafields(self, product_gid: str, category: str, metafields: list, use_shopify_suggestions: bool = True, taxonomy_id: str = None) -> dict:
         """
         Ürünün kategorisini ve meta alanlarını günceller.
         Tek bir mutation ile hem kategori hem de meta alanları günceller.
-        
+
         Args:
             product_gid: Ürün GID (gid://shopify/Product/123456)
             category: Kategori adı (Loglama için)
             metafields: Meta alan listesi [{namespace, key, value, type}]
             use_shopify_suggestions: (Artık kullanılmıyor, geriye dönük uyumluluk için)
             taxonomy_id: Kategori Taxonomy ID (gid://shopify/TaxonomyCategory/aa-1-4)
-            
+
         Returns:
             dict: {'success': bool, 'message': str}
         """
@@ -1873,7 +1845,7 @@ class ShopifyAPI:
             """
 
             result = self.execute_graphql(mutation, {"input": product_input})
-            
+
             # Hata kontrolü
             user_errors = result.get('productUpdate', {}).get('userErrors', [])
             if user_errors:
@@ -1891,18 +1863,18 @@ class ShopifyAPI:
             product_data = result.get('productUpdate', {}).get('product', {})
             updated_cat = product_data.get('category', {})
             cat_name = updated_cat.get('fullName') if updated_cat else category
-            
+
             logging.info(f"✅ Güncelleme başarılı!")
             if cat_name:
                 logging.info(f"   Yeni Kategori: {cat_name}")
-            
+
             return {
                 'success': True,
                 'message': f"Kategori ({cat_name}) ve {len(metafields)} meta alan güncellendi.",
                 'updated_category': cat_name,
                 'updated_metafields': len(metafields)
             }
-            
+
         except Exception as e:
             logging.error(f"❌ Beklenmeyen hata: {e}")
             import traceback
@@ -1913,14 +1885,14 @@ class ShopifyAPI:
                 'updated_category': None,
                 'updated_metafields': 0
             }
-    
+
     def get_product_metafields(self, product_gid: str) -> dict:
         """
         Ürünün mevcut meta alanlarını getirir.
-        
+
         Args:
             product_gid: Ürün GID
-            
+
         Returns:
             dict: Meta alanlar dictionary {namespace.key: value}
         """
@@ -1944,10 +1916,10 @@ class ShopifyAPI:
                 }
             }
             """
-            
+
             result = self.execute_graphql(query, {"id": product_gid})
             product = result.get('product', {})
-            
+
             metafields = {}
             for edge in product.get('metafields', {}).get('edges', []):
                 node = edge['node']
@@ -1956,23 +1928,23 @@ class ShopifyAPI:
                     'value': node['value'],
                     'type': node['type']
                 }
-            
+
             return {
                 'product_type': product.get('productType', ''),
                 'metafields': metafields
             }
-            
+
         except Exception as e:
             logging.error(f"Metafield getirme hatası: {e}")
             return {'product_type': '', 'metafields': {}}
-    
+
     def _map_metafields_to_taxonomy_attributes(self, metafields: list) -> list:
         """
         Custom metafield'ları Shopify taxonomy attribute'lerine map eder.
-        
+
         Args:
             metafields: [{namespace, key, value, type}]
-            
+
         Returns:
             list: Taxonomy attribute inputs
         """
@@ -1997,30 +1969,30 @@ class ShopifyAPI:
             'kumaş': 'Material',
             'kumas': 'Material',
         }
-        
+
         taxonomy_attrs = []
-        
+
         for mf in metafields:
             key = mf.get('key', '')
             value = mf.get('value', '')
-            
+
             # Map edilen attribute varsa ekle
             if key in attribute_mapping and value:
                 taxonomy_attrs.append({
                     'name': attribute_mapping[key],
                     'value': value
                 })
-        
+
         return taxonomy_attrs
-    
+
     def update_product_taxonomy_attributes(self, product_gid: str, attributes: list) -> dict:
         """
         Ürünün taxonomy attribute'lerini günceller.
-        
+
         Args:
             product_gid: Ürün GID
             attributes: [{'name': 'Neckline', 'value': 'V-Neck'}]
-            
+
         Returns:
             dict: {'success': bool, 'updated': int}
         """
@@ -2044,21 +2016,21 @@ class ShopifyAPI:
                 }
             }
             """
-            
+
             # Attribute input'ları hazırla
             # NOT: productSet için attribute format farklıdır
             # Her attribute için değer set etmek yerine,
             # productUpdate ile metafield olarak eklemeye devam edeceğiz
             # Çünkü taxonomy attribute'leri doğrudan set etmek karmaşık
-            
+
             # Şimdilik sadece başarı döndür - bu özellik gelecekte eklenecek
             logging.info("ℹ️  Taxonomy attribute güncellemesi şimdilik metafield olarak yapılıyor")
             return {'success': True, 'updated': len(attributes)}
-            
+
         except Exception as e:
             logging.error(f"Taxonomy attribute güncelleme hatası: {e}")
             return {'success': False, 'updated': 0}
-    
+
     def _create_seo_filename(self, title):
         """
         Ürün başlığından SEO dostu dosya adı oluşturur.
@@ -2066,40 +2038,40 @@ class ShopifyAPI:
         """
         import unicodedata
         import re
-        
+
         # Türkçe karakterleri İngilizce karşılıklarına çevir
         tr_chars = {
             'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
             'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'
         }
-        
+
         filename = title.lower()
         for tr_char, en_char in tr_chars.items():
             filename = filename.replace(tr_char, en_char)
-        
+
         # Özel karakterleri kaldır, sadece harf, rakam ve boşluk bırak
         filename = re.sub(r'[^a-z0-9\s-]', '', filename)
-        
+
         # Birden fazla boşluğu tek tire ile değiştir
         filename = re.sub(r'\s+', '-', filename.strip())
-        
+
         # Birden fazla tireyi tek tire yap
         filename = re.sub(r'-+', '-', filename)
-        
+
         return filename.strip('-')
-    
+
     def create_metafield_definition(self, namespace: str, key: str, name: str, description: str = "", metafield_type: str = "single_line_text_field"):
         """
         Shopify'da metafield definition oluşturur.
         Bu tanım yapılmadan metafield'lar Shopify admin panelinde görünmez!
-        
+
         Args:
             namespace: Namespace (örn: 'custom')
             key: Key (örn: 'yaka_tipi')
             name: Görünen ad (örn: 'Yaka Tipi')
             description: Açıklama
             metafield_type: Tip (varsayılan: 'single_line_text_field')
-            
+
         Returns:
             dict: {'success': bool, 'definition_id': str}
         """
@@ -2121,7 +2093,7 @@ class ShopifyAPI:
                 }
             }
             """
-            
+
             result = self.execute_graphql(
                 mutation,
                 {
@@ -2135,7 +2107,7 @@ class ShopifyAPI:
                     }
                 }
             )
-            
+
             errors = result.get('metafieldDefinitionCreate', {}).get('userErrors', [])
             if errors:
                 # Eğer zaten varsa, hata yerine başarı döndür
@@ -2145,35 +2117,35 @@ class ShopifyAPI:
                 else:
                     logging.error(f"❌ Metafield definition oluşturma hatası: {errors}")
                     return {'success': False, 'error': errors}
-            
+
             created = result.get('metafieldDefinitionCreate', {}).get('createdDefinition', {})
             definition_id = created.get('id');
-            
+
             logging.info(f"✅ Metafield definition oluşturuldu: {namespace}.{key} → '{name}'")
             return {'success': True, 'definition_id': definition_id}
-            
+
         except Exception as e:
             logging.error(f"❌ Metafield definition oluşturma hatası: {e}")
             return {'success': False, 'error': str(e)}
-    
+
     def create_all_metafield_definitions_for_category(self, category: str):
         """
         Bir kategori için tüm metafield definitions'ları oluşturur.
-        
+
         Args:
             category: Kategori adı (örn: 'Elbise', 'T-shirt')
-            
+
         Returns:
             dict: {'success': bool, 'created': int, 'errors': list}
         """
         from utils.category_metafield_manager import CategoryMetafieldManager
-        
+
         try:
             metafield_templates = CategoryMetafieldManager.get_metafields_for_category(category)
-            
+
             created = 0
             errors = []
-            
+
             for field_key, template in metafield_templates.items():
                 # Türkçe başlık oluştur
                 key = template['key']
@@ -2205,10 +2177,10 @@ class ShopifyAPI:
                     'bel_yukseltme': 'Bel Yükseltme',
                     'ust_uzunluk_turu': 'Üst Uzunluk Türü',
                 }
-                
+
                 display_name = name_map.get(key, key.replace('_', ' ').title())
                 description = template.get('description', '')
-                
+
                 result = self.create_metafield_definition(
                     namespace=template['namespace'],
                     key=key,
@@ -2216,35 +2188,35 @@ class ShopifyAPI:
                     description=description,
                     metafield_type=template['type']
                 )
-                
+
                 if result.get('success'):
                     created += 1
                 else:
                     errors.append(result.get('error'))
-            
+
             logging.info(f"✅ {category} kategorisi için {created} metafield definition oluşturuldu/kontrol edildi")
             return {'success': True, 'created': created, 'errors': errors}
-            
+
         except Exception as e:
             logging.error(f"❌ Metafield definitions oluşturma hatası: {e}")
             return {'success': False, 'created': 0, 'errors': [str(e)]}
-    
+
     def update_product_details(self, product_id, tags=None, vendor=None, product_type=None):
         """
         Ürünün etiketlerini, markasını veya tipini günceller.
-        
+
         Args:
             product_id: Ürün GID (gid://shopify/Product/123456)
             tags: Etiket listesi (list of strings) veya virgülle ayrılmış string
             vendor: Marka (Vendor)
             product_type: Ürün Tipi (Product Type)
-            
+
         Returns:
             dict: {'success': bool, 'message': str}
         """
         try:
             input_data = {"id": product_id}
-            
+
             if tags is not None:
                 if isinstance(tags, str):
                     # Virgülle ayrılmış string ise listeye çevir
@@ -2252,13 +2224,13 @@ class ShopifyAPI:
                     input_data["tags"] = tag_list
                 elif isinstance(tags, list):
                     input_data["tags"] = tags
-            
+
             if vendor is not None:
                 input_data["vendor"] = vendor
-                
+
             if product_type is not None:
                 input_data["productType"] = product_type
-            
+
             if len(input_data) <= 1:
                 return {'success': False, 'message': 'Güncellenecek veri yok'}
 
@@ -2278,17 +2250,17 @@ class ShopifyAPI:
               }
             }
             """
-            
+
             result = self.execute_graphql(mutation, {"input": input_data})
-            
+
             errors = result.get('productUpdate', {}).get('userErrors', [])
             if errors:
                 error_msg = f"Güncelleme hatası: {errors}"
                 logging.error(error_msg)
                 return {'success': False, 'message': error_msg}
-            
+
             return {'success': True, 'message': 'Ürün başarıyla güncellendi'}
-            
+
         except Exception as e:
             logging.error(f"Ürün güncelleme hatası: {e}")
             return {'success': False, 'message': str(e)}
@@ -2352,18 +2324,18 @@ class ShopifyAPI:
         """
         variables = {"cursor": None}
         total_fetched = 0
-        
+
         while True:
             if progress_callback:
                 progress_callback(f"Shopify'dan mevcut fiyatlar çekiliyor... {total_fetched} ürün tarandı.")
-                
+
             data = self.execute_graphql(query, variables)
             products_data = data.get("products", {})
-            
+
             for edge in products_data.get("edges", []):
                 node = edge["node"]
                 product_id = node["id"]
-                
+
                 for v_edge in node.get("variants", {}).get("edges", []):
                     v_node = v_edge["node"]
                     all_products.append({
@@ -2373,13 +2345,13 @@ class ShopifyAPI:
                         "price": v_node["price"],
                         "compare_at_price": v_node["compareAtPrice"]
                     })
-            
+
             total_fetched += len(products_data.get("edges", []))
-            
+
             if not products_data.get("pageInfo", {}).get("hasNextPage"):
                 break
-                
+
             variables["cursor"] = products_data["pageInfo"]["endCursor"]
-            
+
         logging.info(f"Fiyat kontrolü için toplam {len(all_products)} varyant çekildi.")
         return all_products
