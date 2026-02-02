@@ -175,31 +175,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ✅ Modern Stats Display
-def display_stat_card(title, value, icon, delta=None, delta_color="normal"):
-    """Modern istatistik kartı gösterimi"""
-    delta_html = ""
-    if delta is not None:
-        color = "#10b981" if delta_color == "normal" else "#ef4444" if delta_color == "inverse" else "#f59e0b"
-        arrow = "↗" if delta >= 0 else "↘"
-        delta_html = f'<div style="color: {color}; font-size: 0.9em; font-weight: 600;">{arrow} {abs(delta)}</div>'
-    
-    return f"""
-    <div style="
-        background: linear-gradient(145deg, #1a1a2e 0%, #252541 100%);
-        border: 1px solid #374151;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-    ">
-        <div style="font-size: 2em; margin-bottom: 0.5rem;">{icon}</div>
-        <div style="font-size: 2.5em; font-weight: 800; color: #f9fafb;">{value}</div>
-        <div style="color: #9ca3af; font-weight: 600; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px;">{title}</div>
-        {delta_html}
-    </div>
-    """
-
 # API bağlantı fonksiyonları
 @st.cache_resource(ttl=300)  # 5 dakika cache
 def get_shopify_client():
@@ -264,86 +239,82 @@ st.markdown("---")
 main_cols = st.columns(2)
 
 with main_cols[0]:
-    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-    st.markdown("### 🏪 Shopify Detayları")
-    
-    shopify_api = get_shopify_client()
-    if shopify_api:
-        with st.spinner("Shopify verileri yükleniyor..."):
-            try:
-                shopify_stats = shopify_api.get_dashboard_stats()
-                
-                shop_info = shopify_stats.get('shop_info', {})
-                
-                # Shopify mağaza bilgileri
-                info_cols = st.columns(2)
-                with info_cols[0]:
-                    st.metric("Bugünkü Sipariş", shopify_stats.get('orders_today', 0))
-                    st.metric("Bu Haftaki Sipariş", shopify_stats.get('orders_this_week', 0))
-                with info_cols[1]:
-                    currency = shop_info.get('currencyCode', 'USD')
-                    st.metric("Bugünkü Gelir", f"{shopify_stats.get('revenue_today', 0):.2f} {currency}")
-                    st.metric("Bu Haftaki Gelir", f"{shopify_stats.get('revenue_this_week', 0):.2f} {currency}")
-                
-                # Mağaza bilgileri
-                st.info(f"""
-                **Mağaza:** {shop_info.get('name', 'N/A')}  
-                **Plan:** {shop_info.get('plan', {}).get('displayName', 'N/A')}  
-                **Domain:** {shop_info.get('primaryDomain', {}).get('host', 'N/A')}  
-                **Ürün Sayısı:** {shopify_stats.get('products_count', 0)}
-                """)
-                
-                # Son siparişler
-                recent_orders = shopify_stats.get('recent_orders', [])
-                if recent_orders:
-                    st.write("**Son Siparişler:**")
-                    for order in recent_orders[:3]:
-                        order_name = order.get('name', 'N/A')
-                        order_total = order.get('totalPriceSet', {}).get('shopMoney', {})
-                        customer = order.get('customer', {})
-                        customer_name = f"{customer.get('firstName', '')} {customer.get('lastName', '')}".strip()
-                        
-                        st.write(f"• {order_name} - {order_total.get('amount', 0)} {order_total.get('currencyCode', '')} ({customer_name})")
-                
-            except Exception as e:
-                st.error(f"Shopify verileri alınamadı: {str(e)}")
-    else:
-        st.warning("Shopify bağlantısı yok. Ayarlar sayfasından bağlantıyı kontrol edin.")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.subheader("🏪 Shopify Detayları")
+
+        shopify_api = get_shopify_client()
+        if shopify_api:
+            with st.spinner("Shopify verileri yükleniyor..."):
+                try:
+                    shopify_stats = shopify_api.get_dashboard_stats()
+
+                    shop_info = shopify_stats.get('shop_info', {})
+
+                    # Shopify mağaza bilgileri
+                    info_cols = st.columns(2)
+                    with info_cols[0]:
+                        st.metric("Bugünkü Sipariş", shopify_stats.get('orders_today', 0))
+                        st.metric("Bu Haftaki Sipariş", shopify_stats.get('orders_this_week', 0))
+                    with info_cols[1]:
+                        currency = shop_info.get('currencyCode', 'USD')
+                        st.metric("Bugünkü Gelir", f"{shopify_stats.get('revenue_today', 0):.2f} {currency}")
+                        st.metric("Bu Haftaki Gelir", f"{shopify_stats.get('revenue_this_week', 0):.2f} {currency}")
+
+                    # Mağaza bilgileri
+                    st.info(f"""
+                    **Mağaza:** {shop_info.get('name', 'N/A')}
+                    **Plan:** {shop_info.get('plan', {}).get('displayName', 'N/A')}
+                    **Domain:** {shop_info.get('primaryDomain', {}).get('host', 'N/A')}
+                    **Ürün Sayısı:** {shopify_stats.get('products_count', 0)}
+                    """)
+
+                    # Son siparişler
+                    recent_orders = shopify_stats.get('recent_orders', [])
+                    if recent_orders:
+                        st.write("**Son Siparişler:**")
+                        for order in recent_orders[:3]:
+                            order_name = order.get('name', 'N/A')
+                            order_total = order.get('totalPriceSet', {}).get('shopMoney', {})
+                            customer = order.get('customer', {})
+                            customer_name = f"{customer.get('firstName', '')} {customer.get('lastName', '')}".strip()
+
+                            st.write(f"• {order_name} - {order_total.get('amount', 0)} {order_total.get('currencyCode', '')} ({customer_name})")
+
+                except Exception as e:
+                    st.error(f"Shopify verileri alınamadı: {str(e)}")
+        else:
+            st.warning("Shopify bağlantısı yok. Ayarlar sayfasından bağlantıyı kontrol edin.")
 
 with main_cols[1]:
-    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-    st.markdown("### 🔗 Sentos API Detayları")
-    
-    sentos_api = get_sentos_client()
-    if sentos_api:
-        with st.spinner("Sentos verileri yükleniyor..."):
-            try:
-                sentos_stats = sentos_api.get_dashboard_stats()
-                
-                info_cols = st.columns(2)
-                with info_cols[0]:
-                    st.metric("Toplam Ürün", sentos_stats.get('total_products', 0))
-                    st.metric("Kategori Sayısı", sentos_stats.get('categories_count', 0))
-                
-                with info_cols[1]:
-                    st.metric("API Durumu", 
-                            "✅ Bağlı" if sentos_stats['api_status'] == 'connected' else "❌ Hata")
-                
-                # Son güncellenen ürünler
-                recent_updates = sentos_stats.get('recent_updates', [])
-                if recent_updates:
-                    st.write("**Son Güncellenen Ürünler:**")
-                    for product in recent_updates[:3]:
-                        st.write(f"• {product.get('name', 'N/A')[:50]}...")
-                
-            except Exception as e:
-                st.error(f"Sentos verileri alınamadı: {str(e)}")
-    else:
-        st.warning("Sentos bağlantısı yok. Ayarlar sayfasından bağlantıyı kontrol edin.")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.subheader("🔗 Sentos API Detayları")
+
+        sentos_api = get_sentos_client()
+        if sentos_api:
+            with st.spinner("Sentos verileri yükleniyor..."):
+                try:
+                    sentos_stats = sentos_api.get_dashboard_stats()
+
+                    info_cols = st.columns(2)
+                    with info_cols[0]:
+                        st.metric("Toplam Ürün", sentos_stats.get('total_products', 0))
+                        st.metric("Kategori Sayısı", sentos_stats.get('categories_count', 0))
+
+                    with info_cols[1]:
+                        st.metric("API Durumu",
+                                "✅ Bağlı" if sentos_stats['api_status'] == 'connected' else "❌ Hata")
+
+                    # Son güncellenen ürünler
+                    recent_updates = sentos_stats.get('recent_updates', [])
+                    if recent_updates:
+                        st.write("**Son Güncellenen Ürünler:**")
+                        for product in recent_updates[:3]:
+                            st.write(f"• {product.get('name', 'N/A')[:50]}...")
+
+                except Exception as e:
+                    st.error(f"Sentos verileri alınamadı: {str(e)}")
+        else:
+            st.warning("Sentos bağlantısı yok. Ayarlar sayfasından bağlantıyı kontrol edin.")
 
 st.markdown("---")
 
