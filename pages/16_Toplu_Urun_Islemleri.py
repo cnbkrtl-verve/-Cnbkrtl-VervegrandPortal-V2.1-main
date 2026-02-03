@@ -58,8 +58,11 @@ if selection_mode == "Koleksiyon Bazlı":
             st.success(f"{len(products)} ürün bulundu.")
 
 elif selection_mode == "Manuel Arama":
-    search_query = st.text_input("Arama Terimi (Ürün Adı, SKU, Tag vb.):")
-    if st.button("Ara") and search_query:
+    with st.form(key="search_form"):
+        search_query = st.text_input("Arama Terimi (Ürün Adı, SKU, Tag vb.):")
+        submit_btn = st.form_submit_button("Ara")
+
+    if submit_btn and search_query:
         with st.spinner("Aranıyor..."):
             products = shopify.search_products(search_query, limit=50)
             st.session_state.target_products = products
