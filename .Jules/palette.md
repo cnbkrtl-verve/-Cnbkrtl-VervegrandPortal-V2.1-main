@@ -5,3 +5,7 @@
 ## 2025-05-23 - Concise Status Badges
 **Learning:** Using `st.badge` for status indicators in lists (e.g., Payment Status) is much cleaner and more space-efficient than full-width alert components like `st.success` or `st.warning`. It keeps the visual flow of the list intact while still providing clear color-coded feedback.
 **Action:** Use `st.badge` for status columns in data grids or lists instead of alerts.
+
+## 2025-05-23 - Action Cards for Navigation
+**Learning:** Replacing bare `st.button` + `st.switch_page` with "Action Cards" (`st.container(border=True)` + `st.markdown` header + `st.caption` + `st.page_link`) significantly improves dashboard navigability and visual hierarchy. `st.page_link` is also faster (SPA navigation) and more accessible (rendered as `<a>`).
+**Action:** Use Action Cards for primary dashboard navigation instead of isolated buttons.
