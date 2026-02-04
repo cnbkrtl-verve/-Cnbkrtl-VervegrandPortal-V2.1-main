@@ -408,21 +408,30 @@ st.markdown("---")
 st.markdown("### ⚡ Hızlı İşlemler")
 
 action_cols = st.columns(4)
+
 with action_cols[0]:
-    if st.button("🔄 Hemen Sync Başlat", use_container_width=True):
-        st.info("Sync işlemi 'Sync' sayfasından başlatılabilir.")
+    with st.container(border=True):
+        st.markdown("##### :blue[Sync]")
+        st.caption("Veri senkronizasyonu")
+        st.page_link("pages/3_sync.py", label="Başlat", icon="🔄", use_container_width=True)
 
 with action_cols[1]:
-    if st.button("📊 Sipariş Analizi", use_container_width=True):
-        st.switch_page("pages/11_Siparis_Izleme.py")
+    with st.container(border=True):
+        st.markdown("##### :green[Analiz]")
+        st.caption("Sipariş ve satışlar")
+        st.page_link("pages/11_Siparis_Izleme.py", label="İncele", icon="📊", use_container_width=True)
 
 with action_cols[2]:
-    if st.button("⚙️ Ayarları Kontrol Et", use_container_width=True):
-        st.switch_page("pages/2_settings.py")
+    with st.container(border=True):
+        st.markdown("##### :grey[Ayarlar]")
+        st.caption("API yapılandırması")
+        st.page_link("pages/2_settings.py", label="Kontrol Et", icon="⚙️", use_container_width=True)
 
 with action_cols[3]:
-    if st.button("📜 Log'ları İncele", use_container_width=True):
-        st.switch_page("pages/4_logs.py")
+    with st.container(border=True):
+        st.markdown("##### :orange[Loglar]")
+        st.caption("Sistem kayıtları")
+        st.page_link("pages/4_logs.py", label="Görüntüle", icon="📜", use_container_width=True)
 
 # --- SİSTEM BİLGİLERİ ---
 with st.expander("🔧 Sistem Bilgileri", expanded=False):
