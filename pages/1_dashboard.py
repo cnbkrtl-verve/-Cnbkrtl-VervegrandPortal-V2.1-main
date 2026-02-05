@@ -278,12 +278,12 @@ with main_cols[0]:
                 # Shopify mağaza bilgileri
                 info_cols = st.columns(2)
                 with info_cols[0]:
-                    st.metric("Bugünkü Sipariş", shopify_stats.get('orders_today', 0))
-                    st.metric("Bu Haftaki Sipariş", shopify_stats.get('orders_this_week', 0))
+                    st.metric("Bugünkü Sipariş", shopify_stats.get('orders_today', 0), help="Bugün oluşturulan toplam sipariş sayısı.")
+                    st.metric("Bu Haftaki Sipariş", shopify_stats.get('orders_this_week', 0), help="Bu hafta oluşturulan toplam sipariş sayısı.")
                 with info_cols[1]:
                     currency = shop_info.get('currencyCode', 'USD')
-                    st.metric("Bugünkü Gelir", f"{shopify_stats.get('revenue_today', 0):.2f} {currency}")
-                    st.metric("Bu Haftaki Gelir", f"{shopify_stats.get('revenue_this_week', 0):.2f} {currency}")
+                    st.metric("Bugünkü Gelir", f"{shopify_stats.get('revenue_today', 0):.2f} {currency}", help="Bugün oluşturulan siparişlerin toplam cirosu.")
+                    st.metric("Bu Haftaki Gelir", f"{shopify_stats.get('revenue_this_week', 0):.2f} {currency}", help="Bu hafta oluşturulan siparişlerin toplam cirosu.")
                 
                 # Mağaza bilgileri
                 st.info(f"""
