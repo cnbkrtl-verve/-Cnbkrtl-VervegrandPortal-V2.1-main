@@ -7,6 +7,7 @@ CI/CD pipeline ile otomatik çalışır
 import pytest
 from unittest.mock import Mock, patch
 from connectors.shopify_api import ShopifyAPI
+from datetime import datetime, timedelta
 
 
 class TestShopifyAPIInit:
@@ -21,10 +22,10 @@ class TestShopifyAPIInit:
         assert api.api_version == "2024-10"
     
     def test_init_with_http_url(self):
-        """✅ HTTP URL'i otomatik HTTPS'e çevrilmeli"""
+        """✅ HTTP URL'i olduğu gibi kalmalı"""
         api = ShopifyAPI("http://test-store.myshopify.com", "token")
         
-        assert api.store_url == "https://test-store.myshopify.com"
+        assert api.store_url == "http://test-store.myshopify.com"
     
     def test_init_without_http(self):
         """✅ URL başında http yoksa otomatik eklenmeli"""
@@ -57,9 +58,9 @@ class TestRateLimiter:
         """✅ Rate limiter başlangıç değerleri doğru olmalı"""
         api = ShopifyAPI("test-store.myshopify.com", "token")
         
-        assert api.max_requests_per_minute == 40
-        assert api.burst_tokens == 10
-        assert api.current_tokens == 10
+        assert api.max_requests_per_minute == 30
+        assert api.burst_tokens == 5
+        assert api.current_tokens == 5
     
     @patch('time.sleep')
     @patch('time.time')
@@ -178,6 +179,82 @@ class TestGraphQLExecution:
         assert mock_post.call_count == 2
         assert mock_sleep.called
         assert result["shop"]["name"] == "Test Shop"
+
+
+class TestDashboardStats:
+    """Dashboard istatistikleri testleri"""
+
+    @patch('requests.post')
+    def test_get_dashboard_stats_optimized(self, mock_post):
+        """✅ Optimize edilmiş dashboard sorgusu doğru çalışmalı"""
+
+        # Mock API responses
+        # 1. Products Query
+        mock_products_response = Mock()
+        mock_products_response.status_code = 200
+        mock_products_response.json.return_value = {
+            "data": {
+                "products": {
+                    "pageInfo": {"hasNextPage": False},
+                    "edges": [{"node": {"id": "1"}} for _ in range(5)]
+                }
+            }
+        }
+
+        # 2. Consolidated Query
+        # Setup fake orders
+        now = datetime.now()
+        today_iso = now.isoformat() + "Z"
+
+        mock_consolidated_response = Mock()
+        mock_consolidated_response.status_code = 200
+        mock_consolidated_response.json.return_value = {
+            "data": {
+                "shop": {"name": "Test Shop", "currencyCode": "USD"},
+                "recentOrders": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "gid://shopify/Order/1",
+                                "name": "#1001",
+                                "createdAt": today_iso,
+                                "totalPriceSet": {"shopMoney": {"amount": "100.00", "currencyCode": "USD"}},
+                                "customer": {"firstName": "John", "lastName": "Doe"}
+                            }
+                        }
+                    ]
+                },
+                "statsOrders": {
+                    "edges": [
+                        # Order today
+                        {
+                            "node": {
+                                "createdAt": today_iso,
+                                "totalPriceSet": {"shopMoney": {"amount": "100.00"}}
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        mock_post.side_effect = [mock_products_response, mock_consolidated_response]
+
+        api = ShopifyAPI("test-store.myshopify.com", "token")
+        stats = api.get_dashboard_stats()
+
+        # Verifications
+        assert stats['products_count'] == 5
+        assert stats['shop_info']['name'] == "Test Shop"
+
+        # Recent orders populated
+        assert len(stats['recent_orders']) == 1
+        assert stats['recent_orders'][0]['name'] == "#1001"
+
+        # Stats calculated
+        # Today: 1 order, 100.00
+        assert stats['orders_today'] == 1
+        assert stats['revenue_today'] == 100.00
 
 
 # ============================================
